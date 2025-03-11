@@ -1,4 +1,4 @@
-# gen-ai-cookbook
+# WIP
 
 docker-compose up -d
 
