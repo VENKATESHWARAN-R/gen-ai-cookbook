@@ -23,14 +23,8 @@ class GemmaLocal(BaseLLM):
         The model name or path.
     max_history : int, optional
         The maximum number of history entries to keep (default is 5).
-    local_files_only : bool, optional
-        Flag to indicate if the model is local or remote (default is False).
-    tokenizer : AutoTokenizer
-        The tokenizer for the model.
-    model : Gemma3ForCausalLM
-        The model for causal language modeling.
-    history : list
-        The history of text inputs.
+    system_prompt : str
+        The system prompt.
     """
 
     def __init__(

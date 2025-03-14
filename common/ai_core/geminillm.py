@@ -1,141 +1,93 @@
 """
-Base class for all language models.
-This defines a common interface for all language models.
-This is just to streamline for custom and specific usecases.
+Sub class for Gemini Based on Gemini API's
+This inherits the base llm and implements the specific methods for gemini
 
-First Version: 2025-Mar-12
+First Version: 2025-Mar-14
 """
 
-from abc import ABC
-from dataclasses import dataclass
-from enum import Enum
-import logging
 import os
-from typing import List, Dict, Any, Union
 import time
+from typing import List, Dict, Any, Union
 
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from google import genai
+from google.genai import types
 
-RAG_PROMPT: str = """
-You are an advanced AI assistant with expertise in retrieving and synthesizing information from provided references. 
-Analyze the given documents and answer the question based strictly on their content.
-
-## Context:
-You will receive multiple documents, each with a unique identifier. Responses should be derived only from the given documents while maintaining clarity and conciseness. If insufficient information is available, state it explicitly.
-
-## Instructions:
-1. **Extract information** only from provided documents.
-2. **Cite references** using document identifiers.
-3. **Ensure coherence** when summarizing multiple sources.
-4. **Avoid speculation** or external knowledge.
-5. **State uncertainty** if the answer is unclear.
-
-## Expected Output:
-- A **concise and accurate** response with relevant citations.
-- A disclaimer if the answer is unavailable.
-
-## Documents:
-{documents}
-
-## User's Question:
-{question}
-"""
-
-TOOL_CALLING_PROMPT: str = """
-You are an expert in function composition. Given a question and available functions, determine the appropriate function/tool calls.
-
-If a function is applicable, return it in the format:
-[func_name1(param1=value1, param2=value2...), func_name2(params)]
-
-If no function applies or parameters are missing, indicate that. Do not include extra text.
-
-## Available Functions:
-{functions_definition}
-"""
+from .basellm import BaseLLM, Role, RolePlay
 
 
-# Creating a Dataclass for roleplay
-@dataclass
-class RolePlay:
+class GemmaLocal(BaseLLM):
     """
-    Dataclass for roleplay.
-    """
+    A class to represent Gemini API for text generation.
 
-    role: str
-    persona: str
-
-
-# Creating enum class for the roles
-class Role(Enum):
-    """
-    Enum class for roles.
-    """
-
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-
-
-# Creating a base class for the models,
-# since we will be experimenting with different models which have different requirements
-class BaseLLM(ABC):
-    """
-    Abstract base class for LLM models, defining common functionality.
+    Attributes:
+    ----------
+    model : str
+        The model name.
+    max_history : int, optional
+        The maximum number of history entries to keep (default is 10).
     """
 
     def __init__(
         self,
-        model: str,
-        max_history: int = 25,
-        system_prompt: str = "",
-        context_length: int = 8192,
-        token_limit: int = 4096,
+        model: str = "",
+        max_history: int = 10,
+        system_prompt: str = None,
         **kwargs,
     ):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.system_prompt = system_prompt
-        self.max_history = max_history
-        self.context_length = context_length
-        self.token_limit = token_limit
-        self.history: List[Dict[str, str]] = []
-        self._role_play_configs: List[RolePlay] = []
-
-        # Load model and tokenizer
-        self.tokenizer = None
-        self.model = None
-        self._rag_prompt = os.getenv("RAG_PROMPT", RAG_PROMPT)
-        self._tool_calling_prompt = os.getenv(
-            "TOOL_CALLING_PROMPT", TOOL_CALLING_PROMPT
-        )
-        self._load_model_and_tokenizer(model, **kwargs)
-
-        # Check if the tokenizer has a pad token and set it to eos_token if not
-        # This is specially needed for Llama models
-        if self.tokenizer.pad_token_id is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        _model = "models/gemini-2.0-flash" if not model else model
+        # Check if GOOGLE_API_KEY is passed in kwargs
+        if "GOOGLE_API_KEY" in kwargs:
+            self._API_KEY = kwargs["GOOGLE_API_KEY"]
+        elif "GOOGLE_API_KEY" in os.environ:
+            self._API_KEY = os.environ["GOOGLE_API_KEY"]
+        else:
+            raise ValueError("GOOGLE_API_KEY is required to use Gemini API")
+        self.gen_ai_client = None
+        self.chat_client = None
+        super().__init__(_model, max_history, system_prompt, **kwargs)
+        self.context_length = 131_072
+        self.token_limit = 4096
+        self.logger.debug("Default role of the AI assistant: %s", system_prompt)
 
     def _load_model_and_tokenizer(self, model: str, **kwargs) -> None:
         """
         Loads the tokenizer and model.
         """
-        self.logger.info("Initializing tokenizer and model...")
+        self.logger.info("Initializing gemini API...")
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                model, torch_dtype=torch.bfloat16, **kwargs
-            )
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model, torch_dtype=torch.bfloat16, **kwargs
-            )
-            self.model.to(self.device)
+            self.tokenizer: Dict = {}
+            self.model = model
+            self.gen_ai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            self.chat_client = self.gen_ai_client.chats.create(model=self.model)
         except Exception as e:
-            self.logger.error("Error loading model '%s': %s", model, e)
-            raise RuntimeError(f"Failed to load model '{model}'") from e
+            self.logger.error("Error consiguring model '%s': %s", model, e)
+            raise RuntimeError(f"Failed to Configure model '{model}'") from e
+        
+    
+    def _create_config_from_kwargs(self, max_output_tokens=None, **kwargs):
+        # Mapping of expected alternative argument names
+        mapping = {
+            "stop_strings": "stop_sequences",
+        }
 
-        self.logger.info("Loaded model: %s", model)
-        self.logger.info("Model type: %s", type(self.model).__name__)
-        self.logger.info("Number of parameters: %s", self.model.num_parameters())
-        self.logger.info("Device: %s", self.device.type)
+        # Prepare data for GenerateContentConfig
+        config_data = {
+            key: kwargs.get(value, kwargs.get(key))
+            for key, value in mapping.items()
+        }
+
+        # Explicitly handle max_output_tokens
+        if max_output_tokens is not None:
+            config_data["max_output_tokens"] = max_output_tokens
+
+        # Include direct matches from kwargs
+        for field in types.GenerateContentConfig.model_fields.keys():
+            if field not in config_data and field in kwargs:
+                if kwargs[field] is not None:
+                    config_data[field] = kwargs[field]
+
+        # Create an instance of GenerateContentConfig
+        return types.GenerateContentConfig(**config_data)
 
     def generate_text(
         self,
@@ -161,49 +113,35 @@ class BaseLLM(ABC):
         str or list[str]
             The generated text. if the input is a list, the output will be a list.
         """
+        # Pass all input arguments to GenerateContentConfig 
         _max_tokens = max_new_tokens or self.token_limit
+        config = self._create_config_from_kwargs(max_new_tokens=_max_tokens, **kwargs)
+        
         if isinstance(prompt, str):
             prompt = [prompt]
 
         self.logger.info("Generating response for prompt: %s", prompt)
         try:
-            with torch.inference_mode():
-                self.logger.debug("Tokenizing prompt: %s", prompt)
-                model_inputs = self.tokenizer(
-                    prompt, padding=True, truncation=True, return_tensors="pt"
-                )
-                model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
-
-                _start_time = time.time()
-                print(f"Generating response for prompt: \n\n {prompt} \n\n")
-                generated_ids = self.model.generate(
-                    **model_inputs,
-                    max_new_tokens=_max_tokens,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    **kwargs,
-                )
-                _end_time = time.time()
-                self.logger.debug("Time taken: %.2f seconds", _end_time - _start_time)
+            self.logger.debug("Tokenizing prompt: %s", prompt)
+            _start_time = time.time()
+            print(f"Generating response for prompt: \n\n {prompt} \n\n")
+            response = self.gen_ai_client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=config,
+            )
+            generated_text = response.text
+            _end_time = time.time()
+            self.logger.debug("Time taken: %.2f seconds", _end_time - _start_time)
 
         except Exception as e:
             self.logger.error("Error generating response: %s", e)
             return f"Error generating response: {str(e)}"
 
-        generated_ids = [
-            output_ids[len(input_ids) :]
-            for input_ids, output_ids in zip(
-                model_inputs.get("input_ids"), generated_ids
-            )
-        ]
-        decoded_outputs = self.tokenizer.batch_decode(
-            generated_ids, skip_special_tokens=skip_special_tokens
-        )
-        self.logger.debug("Generated response: %s", decoded_outputs)
-        print("Generated response: ", decoded_outputs)
+        self.logger.debug("Generated response: %s", generated_text)
+        print("Generated response: ", generated_text)
 
-        return (
-            decoded_outputs[0].strip() if len(decoded_outputs) == 1 else decoded_outputs
-        )
+        return generated_text
 
     def generate_response(
         self,
@@ -305,43 +243,39 @@ class BaseLLM(ABC):
         if clear_session:
             self.clear_history()
 
+        return_dict: Dict[str, Any] = {}
+
         # Initialize chat history if not provided
         if chat_history is None:
             chat_history = []
             _history_checker = False
 
-        # Determine if we need to create a new chat session
-        create_chat_session = not self.history and not chat_history
-
         # If self.history exists, use it as chat_history
         if self.history and not chat_history:
             chat_history = self.history
-        # Adding the chat prompt to chat history
-        generated_response = self.generate_response(
-            prompt,
-            create_chat_session=create_chat_session,
-            chat_history=chat_history,
-            **kwargs,
-        )
 
-        extracted_response = generated_response.get(
-            "response", "Error generating response"
-        )
+        # Converting chat_history to Gemini API format
+        transformed_history, system_instruction = self.transform_history_for_gemini(chat_history, prompt)
 
+        # Generate response
+        generated_response = self.generate_text(
+            transformed_history, system_instruction=system_instruction, **kwargs
+        )
+        return_dict["response"] = generated_response
         # If no chat history is passed, add the user input and model response to the history
         if not _history_checker and not stateless:
-            self.add_to_history(prompt, extracted_response)
-            generated_response["chat_history"] = self.history
+            self.add_to_history(prompt, generated_response)
+            return_dict["chat_history"] = self.history
         else:  # if chat history is passed, return the chat history as is
-            generated_response["chat_history"] = chat_history
-            generated_response["chat_history"].extend(
+            return_dict["chat_history"] = chat_history
+            return_dict["chat_history"].extend(
                 [
                     {"role": Role.USER.value, "content": prompt},
-                    {"role": Role.ASSISTANT.value, "content": extracted_response},
+                    {"role": Role.ASSISTANT.value, "content": generated_response},
                 ]
             )
 
-        return generated_response
+        return return_dict
 
     def stateless_chat(
         self,
@@ -429,40 +363,52 @@ class BaseLLM(ABC):
                 chat_input.append({"role": Role.USER.value, "content": _content})
 
         chat_response = self.stateless_chat(chat_history=chat_input, **kwargs)
-        model_response = chat_response.get("response", "Error generating response").strip()
+        model_response = chat_response.get(
+            "response", "Error generating response"
+        ).strip()
 
         # Removing Role Tokens from the response
         for roles in available_roles:
-            model_response = model_response.replace(roles + ":", "", 1) if model_response.startswith(roles + ":") else model_response
+            model_response = (
+                model_response.replace(roles + ":", "", 1)
+                if model_response.startswith(roles + ":")
+                else model_response
+            )
         # Append the model response to the chat history
         _messages = messages.copy()
         _messages.append({"role": role, "content": model_response})
 
         return {"response": model_response, "chat_history": _messages}
-
-    def get_token_count(self, text: str) -> int:
-        """
-        Gets the token count of the given text.
-        """
-        return len(self.tokenizer(text)["input_ids"])
-
-    # Method for getting the templates
-    def get_templates(self) -> Dict[str, str]:
-        """
-        Get the templates from the model.
-        """
-        return {
-            "user_turn_template": self.user_turn_template,
-            "assistant_turn_template": self.assistant_turn_template,
-            "assistant_template": self.assistant_template,
-            "rag_prompt": self.rag_prompt,
-            "rag_prompt_template": self.rag_prompt_template,
-            "tools_prompt_template": self.tools_prompt_template,
-            "default_prompt_template": self.default_prompt_template,
-            "non_sys_prompt_template": self.non_sys_prompt_template,
-            "system_prompt_template": self.system_template,
-            "tool_calling_prompt": self.tool_calling_prompt,
-        }
+    
+    def transform_history_for_gemini(history, user_prompt:str = None):
+        """Transform the conversation history into the format expected by Google Gemini API."""
+        transformed_history = []
+        _system_instruction = None
+        for message in history:
+            if message["role"] == Role.SYSTEM.value:
+                _system_instruction = f"{message['content']}"
+                continue
+            transformed_message = {
+                "role": message["role"],
+                "parts": [
+                    {
+                        "text": message["content"]
+                    }
+                ]
+            }
+            transformed_history.append(transformed_message)
+        if user_prompt:
+            transformed_history.append(
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": user_prompt
+                        }
+                    ]
+                }
+            )
+        return transformed_history, _system_instruction
 
     def format_prompt(
         self,
@@ -498,88 +444,6 @@ class BaseLLM(ABC):
 
         # Default formatting (with or without system prompt)
         return self._format_default_prompt(prompt, system_prompt)
-
-    def trim_conversation(
-        self, conversation_history: List[Dict[str, str]], token_limit: int
-    ) -> List[Dict[str, str]]:
-        """
-        Trims the conversation history to fit within the given token limit,
-        while retaining system messages and accounting for their token count.
-
-        Parameters:
-        ----------
-        conversation_history : List[Dict[str, str]]
-            List of messages with 'role' and 'content' keys.
-        token_limit : int
-            The maximum allowed token count.
-
-        Returns:
-        -------
-        List[Dict[str, str]]
-            Trimmed conversation history.
-        """
-        if not conversation_history or not isinstance(conversation_history, list):
-            return []
-
-        total_tokens = 0
-        tokenized_history = []
-        system_messages = []
-
-        # Iterate through history and separate system messages
-        for message in conversation_history:
-            role = message.get("role")
-            content = message.get("content")
-            message_tokens = self.get_token_count(
-                content
-            )  # Get token count for all messages
-
-            if role == Role.SYSTEM.value:
-                system_messages.append(
-                    {"role": role, "content": content, "tokens": message_tokens}
-                )
-            else:
-                total_tokens += message_tokens
-                tokenized_history.append(
-                    {"role": role, "content": content, "tokens": message_tokens}
-                )
-
-        # Include system messages in total token count
-        system_token_count = sum(msg["tokens"] for msg in system_messages)
-
-        # Adjust token limit to account for system messages
-        available_token_budget = token_limit - system_token_count
-
-        # If system messages alone exceed the limit, return only system messages
-        if available_token_budget <= 0:
-            return [
-                {"role": msg["role"], "content": msg["content"]}
-                for msg in system_messages
-            ]
-
-        # Trim non-system messages to fit within remaining token limit
-        while total_tokens > available_token_budget and tokenized_history:
-            removed_entry = tokenized_history.pop(0)
-            total_tokens -= removed_entry["tokens"]
-
-        # Return trimmed conversation while ensuring system messages are retained
-        return [
-            {"role": msg["role"], "content": msg["content"]} for msg in system_messages
-        ] + [
-            {"role": entry["role"], "content": entry["content"]}
-            for entry in tokenized_history
-        ]
-
-    def clear_history(self) -> None:
-        """Clears the stored conversation history."""
-        self.history = []
-
-    def add_to_history(self, user_input, model_response) -> None:
-        """Adds an interaction to history and maintains max history size."""
-        _user = {"role": Role.USER.value, "content": user_input}
-        _assistant = {"role": Role.ASSISTANT.value, "content": model_response}
-        self.history.extend([_user, _assistant])
-        if len(self.history) > self.max_history:
-            self.history.pop(0)
 
     def _format_chat_history(self, prompt: str, chat_history: List[Dict]) -> str:
         """
@@ -697,124 +561,44 @@ class BaseLLM(ABC):
 
         return self.non_sys_prompt_template.format(user_prompt=prompt)
 
-    @property
-    def role_play_configs(self) -> List[RolePlay]:
-        """Returns the role-play configurations."""
-        return self._role_play_configs
-
-    @role_play_configs.setter
-    def role_play_configs(self, configs: List[RolePlay]) -> None:
-        """Sets the role-play configurations."""
-        assert all(
-            isinstance(config, RolePlay) for config in configs
-        ), "RolePlay configs must be of type RolePlay"
-        self._role_play_configs = configs
-
-    @property
-    def device(self) -> torch.device:
-        """Returns the available device (GPU or CPU)"""
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    @property
-    def rag_prompt(self) -> str:
-        """Retrieves the RAG prompt from environment variables or uses the default."""
-        if "{documents}" not in self._rag_prompt:
-            self.logger.warning("RAG prompt does not contain document placeholder")
-        return self._rag_prompt
-
-    @rag_prompt.setter
-    def rag_prompt(self, rag_prompt: str) -> None:
-        """Sets the RAG prompt."""
-        if "{documents}" not in rag_prompt:
-            self.logger.warning("RAG prompt does not contain document placeholder")
-        self._rag_prompt = rag_prompt
-
-    @property
-    def tool_calling_prompt(self) -> str:
-        """Retrieves the tool calling prompt from environment variables or uses the default."""
-        return self._tool_calling_prompt
-
-    @tool_calling_prompt.setter
-    def tool_calling_prompt(self, tool_calling_prompt: str) -> None:
-        """Sets the tool calling prompt."""
-        self._tool_calling_prompt = tool_calling_prompt
+    def get_token_count(self, text: str) -> int:
+        """
+        Gets the token count of the given text.
+        """
+        return "NOT IMPLEMENTED"
 
     @property
     def special_tokens(self) -> List[str]:
         """Abstract property for special tokens that must be implemented in subclasses."""
-        return ["<SYSTEM_INSTRUCTIONS>", "<USER>", "<ASSISTANT>"]
+        return [
+            "<bos>",
+            "<start_of_turn>user",
+            "<start_of_turn>model",
+            "<start_of_turn>",
+            "<end_of_turn>",
+        ]
 
     @property
     def bos_token(self) -> str:
         """Abstract property for BOS token that must be implemented in subclasses."""
-        return ""
+        return "<bos>"
 
     @property
     def system_template(self) -> str:
         """System message template"""
-        return "<SYSTEM_INSTRUCTIONS> {system_prompt} \n\n</SYSTEM_INSTRUCTIONS>"
+        return "\n{system_prompt}\n"
 
     @property
     def user_turn_template(self) -> str:
         """User turn template"""
-        return "<USER> {user_prompt} \n\n</USER>"
+        return "\n{user_prompt}\n"
 
     @property
     def assistant_turn_template(self) -> str:
         """Assistant turn template"""
-        return "<ASSISTANT> {assistant_response} </ASSISTANT>"
+        return "\n{assistant_response}\n"
 
     @property
     def assistant_template(self) -> str:
         """Assistant response placeholder"""
-        return "<ASSISTANT> "
-
-    @property
-    def rag_prompt_template(self) -> str:
-        """Template for RAG-based prompts"""
-        return f"{self.bos_token}\n{self.system_template}\n{self.user_turn_template}\n{self.assistant_template}"
-
-    @property
-    def tools_prompt_template(self) -> str:
-        """Template for tool-using prompts"""
-        return f"{self.bos_token}\n{self.system_template}\n{self.user_turn_template}\n{self.assistant_template}"
-
-    @property
-    def default_prompt_template(self) -> str:
-        """Default fallback prompt template"""
-        return f"{self.bos_token}\n{self.system_template}\n{self.user_turn_template}\n{self.assistant_template}"
-
-    @property
-    def non_sys_prompt_template(self) -> str:
-        """Prompt template when no system prompt is provided"""
-        return f"{self.bos_token}\n{self.user_turn_template}\n{self.assistant_template}"
-
-    def __call__(self, prompt: Union[List[str], str], **kwargs) -> str:
-        """
-        Enables direct inference by calling the model instance.
-        """
-        return self.generate_text(prompt, **kwargs)
-
-    def __repr__(self):
-        """
-        Official string representation for debugging.
-        """
-        return f"{self.__class__.__name__}(model={self.model.name_or_path!r}, device={self.device})"
-
-    def __str__(self):
-        """
-        User-friendly string representation.
-        """
-        return f"{self.__class__.__name__} running on {self.device.type}, max history: {self.max_history}"
-
-    def __len__(self):
-        """
-        Returns the number of stored conversation history entries.
-        """
-        return len(self.history)
-
-    def __getitem__(self, index):
-        """
-        Retrieves conversation history entries like an array.
-        """
-        return self.history[index]
+        return "\n"
