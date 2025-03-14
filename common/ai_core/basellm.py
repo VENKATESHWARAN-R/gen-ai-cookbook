@@ -6,11 +6,12 @@ This is just to streamline for custom and specific usecases.
 First Version: 2025-Mar-12
 """
 
-import abc
+from abc import ABC
 from dataclasses import dataclass
+from enum import Enum
 import logging
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import time
 
 import torch
@@ -65,9 +66,20 @@ class RolePlay:
     persona: str
 
 
+# Creating enum class for the roles
+class Role(Enum):
+    """
+    Enum class for roles.
+    """
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
 # Creating a base class for the models,
 # since we will be experimenting with different models which have different requirements
-class BaseLLM(abc.ABC):
+class BaseLLM(ABC):
     """
     Abstract base class for LLM models, defining common functionality.
     """
@@ -92,9 +104,18 @@ class BaseLLM(abc.ABC):
         # Load model and tokenizer
         self.tokenizer = None
         self.model = None
-        self.load_model_and_tokenizer(model, **kwargs)
+        self._rag_prompt = os.getenv("RAG_PROMPT", RAG_PROMPT)
+        self._tool_calling_prompt = os.getenv(
+            "TOOL_CALLING_PROMPT", TOOL_CALLING_PROMPT
+        )
+        self._load_model_and_tokenizer(model, **kwargs)
 
-    def load_model_and_tokenizer(self, model: str, **kwargs) -> None:
+        # Check if the tokenizer has a pad token and set it to eos_token if not
+        # This is specially needed for Llama models
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    def _load_model_and_tokenizer(self, model: str, **kwargs) -> None:
         """
         Loads the tokenizer and model.
         """
@@ -118,44 +139,45 @@ class BaseLLM(abc.ABC):
 
     def generate_text(
         self,
-        prompt: str,
+        prompt: Union[List[str], str],
         max_new_tokens: int = None,
-        skip_special_tokens: bool = False,
+        skip_special_tokens: bool = True,
         **kwargs,
-    ) -> str:
+    ) -> Union[List[str], str]:
         """
         Generates text based on the given prompt.
 
         Parameters:
         ----------
-        prompt : str
+        prompt : str or list[str]
             The prompt text to generate text from.
         max_new_tokens : int, optional
             The maximum length of the generated text.
         skip_special_tokens : bool, optional
-            Flag to indicate if special tokens should be skipped (default is False).
+            Flag to indicate if special tokens should be skipped (default is True).
 
         Returns:
         -------
-        str
-            The generated text.
+        str or list[str]
+            The generated text. if the input is a list, the output will be a list.
         """
         _max_tokens = max_new_tokens or self.token_limit
-        if not prompt or not prompt.strip():
-            self.logger.warning("Received empty prompt, returning empty response.")
-            return ""
+        if isinstance(prompt, str):
+            prompt = [prompt]
 
         self.logger.info("Generating response for prompt: %s", prompt)
         try:
             with torch.inference_mode():
                 self.logger.debug("Tokenizing prompt: %s", prompt)
-                print("Tokenizing prompt...", prompt)
-                inputs = self.tokenizer(prompt, return_tensors="pt")
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                model_inputs = self.tokenizer(
+                    prompt, padding=True, truncation=True, return_tensors="pt"
+                )
+                model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
 
                 _start_time = time.time()
-                outputs = self.model.generate(
-                    **inputs,
+                print(f"Generating response for prompt: \n\n {prompt} \n\n")
+                generated_ids = self.model.generate(
+                    **model_inputs,
                     max_new_tokens=_max_tokens,
                     pad_token_id=self.tokenizer.eos_token_id,
                     **kwargs,
@@ -167,75 +189,21 @@ class BaseLLM(abc.ABC):
             self.logger.error("Error generating response: %s", e)
             return f"Error generating response: {str(e)}"
 
-        decoded_output = self.tokenizer.decode(
-            outputs[0], skip_special_tokens=skip_special_tokens
-        )
-        self.logger.debug("Generated response: %s", decoded_output)
-        print("Generated response: ", decoded_output)
-
-        return decoded_output
-
-    def generate_text_batch(
-        self,
-        prompts: List[str],
-        max_new_tokens: int = None,
-        skip_special_tokens: bool = False,
-        **kwargs,
-    ) -> List[str]:
-        """
-        Generates text for a batch of prompts.
-
-        Parameters:
-        ----------
-        prompts : list[str]
-            A list of prompt texts to generate text from.
-        max_new_tokens : int, optional
-            The maximum number of new tokens to generate.
-        skip_special_tokens : bool, optional
-            Flag to indicate if special tokens should be skipped (default is False).
-
-        Returns:
-        -------
-        list[str]
-            A list of generated texts corresponding to the input prompts.
-        """
-        if not prompts or all(not p.strip() for p in prompts):
-            self.logger.warning("Received empty prompts, returning empty responses.")
-            return [""] * len(prompts)
-
-        _max_tokens = max_new_tokens or self.token_limit
-        self.logger.info("Generating responses for %d prompts", len(prompts))
-
-        try:
-            with torch.inference_mode():
-                self.logger.debug("Tokenizing prompts: %s", prompts)
-                inputs = self.tokenizer(
-                    prompts, padding=True, truncation=True, return_tensors="pt"
-                )
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-                _start_time = time.time()
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=_max_tokens,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    **kwargs,
-                )
-                _end_time = time.time()
-                self.logger.debug("Time taken: %.2f seconds", _end_time - _start_time)
-
-        except Exception as e:
-            self.logger.error("Error generating responses: %s", e)
-            return [f"Error generating response: {str(e)}"] * len(prompts)
-
-        # Decode outputs
-        decoded_outputs = [
-            self.tokenizer.decode(output, skip_special_tokens=skip_special_tokens)
-            for output in outputs
+        generated_ids = [
+            output_ids[len(input_ids) :]
+            for input_ids, output_ids in zip(
+                model_inputs.get("input_ids"), generated_ids
+            )
         ]
+        decoded_outputs = self.tokenizer.batch_decode(
+            generated_ids, skip_special_tokens=skip_special_tokens
+        )
+        self.logger.debug("Generated response: %s", decoded_outputs)
+        print("Generated response: ", decoded_outputs)
 
-        self.logger.debug("Generated responses: %s", decoded_outputs)
-        return decoded_outputs
+        return (
+            decoded_outputs[0].strip() if len(decoded_outputs) == 1 else decoded_outputs
+        )
 
     def get_token_count(self, text: str) -> int:
         """
@@ -277,7 +245,7 @@ class BaseLLM(abc.ABC):
                 content
             )  # Get token count for all messages
 
-            if role == "system":
+            if role == Role.SYSTEM.value:
                 system_messages.append(
                     {"role": role, "content": content, "tokens": message_tokens}
                 )
@@ -319,8 +287,8 @@ class BaseLLM(abc.ABC):
 
     def add_to_history(self, user_input, model_response) -> None:
         """Adds an interaction to history and maintains max history size."""
-        _user = {"role": "user", "content": user_input}
-        _assistant = {"role": "assistant", "content": model_response}
+        _user = {"role": Role.USER.value, "content": user_input}
+        _assistant = {"role": Role.ASSISTANT.value, "content": model_response}
         self.history.extend([_user, _assistant])
         if len(self.history) > self.max_history:
             self.history.pop(0)
@@ -414,8 +382,9 @@ class BaseLLM(abc.ABC):
 
         Returns:
         -------
-        str
-            The generated text.
+        dict
+            The response and chat history.
+            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
         """
         _chat_history = []
 
@@ -437,14 +406,13 @@ class BaseLLM(abc.ABC):
             skip_special_tokens=skip_special_tokens,
             **kwargs,
         )
-        # removing the prompt and special tokens from the model response
-        model_response = model_response.split(self.split_token)[-1].strip()
+
         for token in self.special_tokens:
             model_response = model_response.replace(token, "")
         model_response = model_response.strip()
         # Add the user input and model response to the chat history
-        _chat_history.append({"role": "user", "content": prompt})
-        _chat_history.append({"role": "assistant", "content": model_response})
+        _chat_history.append({"role": Role.USER.value, "content": prompt})
+        _chat_history.append({"role": Role.ASSISTANT.value, "content": model_response})
 
         return {"response": model_response, "chat_history": _chat_history}
 
@@ -453,6 +421,7 @@ class BaseLLM(abc.ABC):
         prompt: str,
         chat_history: List[Dict] = None,
         clear_session: bool = False,
+        stateless: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -469,6 +438,7 @@ class BaseLLM(abc.ABC):
         -------
         dict
             The response and chat history.
+            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
         """
         _history_checker: bool = (
             True  # flag to see if the chat history is passed, so we can return the chat history in the response without affecting original
@@ -500,15 +470,15 @@ class BaseLLM(abc.ABC):
         )
 
         # If no chat history is passed, add the user input and model response to the history
-        if not _history_checker:
+        if not _history_checker and not stateless:
             self.add_to_history(prompt, extracted_response)
             generated_response["chat_history"] = self.history
         else:  # if chat history is passed, return the chat history as is
             generated_response["chat_history"] = chat_history
             generated_response["chat_history"].extend(
                 [
-                    {"role": "user", "content": prompt},
-                    {"role": "assistant", "content": extracted_response},
+                    {"role": Role.USER.value, "content": prompt},
+                    {"role": Role.ASSISTANT.value, "content": extracted_response},
                 ]
             )
 
@@ -516,7 +486,8 @@ class BaseLLM(abc.ABC):
 
     def stateless_chat(
         self,
-        messages: List[Dict[str, str]],
+        prompt: str = "",
+        chat_history: List[Dict[str, str]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -524,25 +495,31 @@ class BaseLLM(abc.ABC):
 
         Parameters:
         ----------
-        messages : List[Dict[str, str]]
-            The list of messages with 'role' and 'content' keys.
+        prompt : str, optional
+            The user prompt. if user prompt is not provided, the last user input from chat history will be used (default is "").
+        chat_history : list, optional
+            The chat history for the prompt (default is None).
 
         Returns:
         -------
         dict
             The response and chat history.
+            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
         """
-        chat_history = self.trim_conversation(messages, self.context_length)
-        user_input = chat_history.pop()["content"]
-        return self.chat(user_input, chat_history=chat_history, **kwargs)
+        if not prompt and not chat_history:
+            return {"response": "No prompt provided", "chat_history": []}
+        if chat_history:
+            chat_history = self.trim_conversation(chat_history, self.context_length)
+        user_input = chat_history.pop()["content"] if not prompt else prompt
+        return self.chat(
+            user_input, chat_history=chat_history, stateless=True, **kwargs
+        )
 
     def multi_role_chat(
         self,
         messages: List[Dict[str, str]],
         role: str,
         role_play_configs: List[RolePlay] = None,
-        brainstrom: bool = False,
-        skip_special_tokens: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -561,54 +538,48 @@ class BaseLLM(abc.ABC):
         -------
         dict
             The response and chat history.
+            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
         """
 
         role_play_configs = role_play_configs or self.role_play_configs
 
         # Extract unique roles from messages
-        message_roles = {msg["role"] for msg in messages}
+        available_roles = {rp.role for rp in role_play_configs}
 
         # Get the persona for each role in messages
-        role_persona_map = {
-            rp.role: rp.persona
-            for rp in role_play_configs
-            if rp.role in message_roles or rp.role == role
-        }
+        role_persona_map = {rp.role: rp.persona for rp in role_play_configs}
 
         # Construct prompt with role-play personas
-        prompt_template = (
-            "This is a group chat with following participants personas:\n\n"
+        system_instruction = (
+            f"You are in a group chatt. Your assigned role is {role}. Always respond in the {role} persona conceisly.\n\n"
+            f"Here are the personas for each role:\n\n"
         )
-        for role, persona in role_persona_map.items():
-            prompt_template += f"{role}'s persona: {persona}\n"
+        for persona_role, persona in role_persona_map.items():
+            system_instruction += f"- {persona_role}: {persona}\n\n"
 
         chat_history = self.trim_conversation(messages, self.context_length)
 
+        # Preparing messages for the chat option
+        chat_input = [{"role": Role.SYSTEM.value, "content": system_instruction}]
+
         for message in chat_history:
-            prompt_template += f"\n{message['role']}: {message['content']}\n <END>"
+            _content = message["role"] + ": " + message["content"]
+            if message["role"] == role:
+                chat_input.append({"role": Role.ASSISTANT.value, "content": _content})
+            else:
+                chat_input.append({"role": Role.USER.value, "content": _content})
 
-        prompt_template += f"\n{role}: "
-        if brainstrom:
-            generated_response = self.generate_text(
-                prompt_template, skip_special_tokens=skip_special_tokens, **kwargs
-            )
-        else:
-            stop_strings = [_role + ":" for _role in role_persona_map.keys()] + [
-                "<END>"
-            ]
-            tokenizer = kwargs.pop("tokenizer", self.tokenizer)
-            stop_strings = kwargs.pop("stop_strings", stop_strings)
-            generated_response = self.generate_text(
-                prompt_template,
-                skip_special_tokens=skip_special_tokens,
-                stop_strings=stop_strings,
-                tokenizer=tokenizer,
-                **kwargs,
-            )
-        generated_response = generated_response.split(f"{role}: ")[-1].strip()
-        chat_history.append({"role": role, "content": generated_response})
+        chat_response = self.stateless_chat(chat_history=chat_input, **kwargs)
+        model_response = chat_response.get("response", "Error generating response").strip()
 
-        return {"response": generated_response, "chat_history": chat_history}
+        # Removing Role Tokens from the response
+        for roles in available_roles:
+            model_response = model_response.replace(roles + ":", "", 1) if model_response.startswith(roles + ":") else model_response
+        # Append the model response to the chat history
+        _messages = messages.copy()
+        _messages.append({"role": role, "content": model_response})
+
+        return {"response": model_response, "chat_history": _messages}
 
     def _format_chat_history(self, prompt: str, chat_history: List[Dict]) -> str:
         """
@@ -616,11 +587,16 @@ class BaseLLM(abc.ABC):
         """
         self.logger.debug("Formatting prompt with chat history")
 
-        final_prompt = self.bos_token
+        final_prompt: str = self.bos_token
 
         # Extract system prompt from chat history (if present)
         system_prompt = next(
-            (msg["content"] for msg in chat_history if msg["role"] == "system"), None
+            (
+                msg["content"]
+                for msg in chat_history
+                if msg["role"] == Role.SYSTEM.value
+            ),
+            None,
         )
         if system_prompt:
             final_prompt += (
@@ -629,11 +605,11 @@ class BaseLLM(abc.ABC):
 
         # Format user and assistant exchanges
         for msg in chat_history:
-            if msg["role"] == "user":
+            if msg["role"] == Role.USER.value:
                 final_prompt += (
                     f"\n{self.user_turn_template.format(user_prompt=msg['content'])}"
                 )
-            elif msg["role"] == "assistant":
+            elif msg["role"] == Role.ASSISTANT.value:
                 final_prompt += f"\n{self.assistant_turn_template.format(assistant_response=msg['content'])}"
 
         # Append current user prompt and assistant placeholder
@@ -665,9 +641,15 @@ class BaseLLM(abc.ABC):
         """
         self.logger.debug("Formatting prompt with tool schema")
 
-        system_prompt = self.tool_calling_prompt.format(
-            functions_definition=tools_schema
-        )
+        try:
+            system_prompt = self.tool_calling_prompt.format(
+                functions_definition=tools_schema
+            )
+        except Exception as e:
+            self.logger.error("Error formatting tool schema: %s", e)
+            system_prompt = self.tool_calling_prompt.replace(
+                "{functions_definition}", tools_schema
+            )
         return self.tools_prompt_template.format(
             system_prompt=system_prompt, user_prompt=prompt
         )
@@ -684,12 +666,20 @@ class BaseLLM(abc.ABC):
         ), "Documents must contain 'reference' and 'content' keys."
 
         formatted_documents = "\n".join(
-            f"**Document {doc['reference']}**: {doc['content']}" for doc in documents
+            f"**Document {doc.get('reference', 'No Reference available')}**: {doc.get('content', 'No Content available in this document - SKIP THIS')}"
+            for doc in documents
         )
 
-        system_prompt = self.rag_prompt.format(
-            documents=formatted_documents, question=prompt
-        )
+        try:
+            system_prompt = self.rag_prompt.format(
+                documents=formatted_documents, question=prompt
+            )
+        except Exception as e:
+            self.logger.error("Error formatting RAG prompt: %s", e)
+            system_prompt = self.rag_prompt.replace(
+                "{documents}", formatted_documents
+            ).replace("{question}", prompt)
+
         return self.rag_prompt_template.format(
             system_prompt=system_prompt, user_prompt=prompt
         )
@@ -728,22 +718,26 @@ class BaseLLM(abc.ABC):
     @property
     def rag_prompt(self) -> str:
         """Retrieves the RAG prompt from environment variables or uses the default."""
-        prompt = os.getenv("RAG_PROMPT", RAG_PROMPT)
+        if "{documents}" not in self._rag_prompt:
+            self.logger.warning("RAG prompt does not contain document placeholder")
+        return self._rag_prompt
 
-        if "{documents}" not in prompt:
-            self.logger.warning("RAG_PROMPT is missing '{documents}' placeholder!")
-
-        return prompt
+    @rag_prompt.setter
+    def rag_prompt(self, rag_prompt: str) -> None:
+        """Sets the RAG prompt."""
+        if "{documents}" not in rag_prompt:
+            self.logger.warning("RAG prompt does not contain document placeholder")
+        self._rag_prompt = rag_prompt
 
     @property
     def tool_calling_prompt(self) -> str:
         """Retrieves the tool calling prompt from environment variables or uses the default."""
-        return os.getenv("TOOL_CALLING_PROMPT", TOOL_CALLING_PROMPT)
+        return self._tool_calling_prompt
 
-    @property
-    def split_token(self) -> str:
-        """Abstract property for split token that must be implemented in subclasses."""
-        return "<ASSISTANT>"
+    @tool_calling_prompt.setter
+    def tool_calling_prompt(self, tool_calling_prompt: str) -> None:
+        """Sets the tool calling prompt."""
+        self._tool_calling_prompt = tool_calling_prompt
 
     @property
     def special_tokens(self) -> List[str]:
@@ -795,7 +789,7 @@ class BaseLLM(abc.ABC):
         """Prompt template when no system prompt is provided"""
         return f"{self.bos_token}\n{self.user_turn_template}\n{self.assistant_template}"
 
-    def __call__(self, prompt: str, **kwargs) -> str:
+    def __call__(self, prompt: Union[List[str], str], **kwargs) -> str:
         """
         Enables direct inference by calling the model instance.
         """

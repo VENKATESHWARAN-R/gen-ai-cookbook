@@ -44,7 +44,7 @@ class GemmaLocal(BaseLLM):
         super().__init__(_model, max_history, system_prompt, **kwargs)
         self.logger.debug("Default role of the AI assistant: %s", system_prompt)
 
-    def load_model_and_tokenizer(self, model: str, **kwargs) -> None:
+    def _load_model_and_tokenizer(self, model: str, **kwargs) -> None:
         """
         Loads the tokenizer and model.
         """
@@ -65,11 +65,6 @@ class GemmaLocal(BaseLLM):
         self.logger.info("Model type: %s", type(self.model).__name__)
         self.logger.info("Number of parameters: %s", self.model.num_parameters())
         self.logger.info("Device: %s", self.device.type)
-
-    @property
-    def split_token(self) -> str:
-        """Abstract property for split token that must be implemented in subclasses."""
-        return "<start_of_turn>model"
 
     @property
     def special_tokens(self) -> List[str]:

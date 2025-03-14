@@ -41,11 +41,6 @@ class LlamaLocal(BaseLLM):
         self.logger.debug("Default role of the AI assistant: %s", system_prompt)
 
     @property
-    def split_token(self) -> str:
-        """Abstract property for split token that must be implemented in subclasses."""
-        return "<|end_header_id|>"
-
-    @property
     def special_tokens(self) -> List[str]:
         """Abstract property for special tokens that must be implemented in subclasses."""
         return [
@@ -63,19 +58,19 @@ class LlamaLocal(BaseLLM):
     @property
     def system_template(self) -> str:
         """System message template"""
-        return "<|start_header_id|>system<|end_header_id|> {system_prompt} <|eot_id|>"
+        return "<|start_header_id|>system<|end_header_id|>\n{system_prompt}<|eot_id|>"
 
     @property
     def user_turn_template(self) -> str:
         """User turn template"""
-        return "<|start_header_id|>user<|end_header_id|> {user_prompt} <|eot_id|>"
+        return "<|start_header_id|>user<|end_header_id|>\n{user_prompt}<|eot_id|>"
 
     @property
     def assistant_turn_template(self) -> str:
         """Assistant turn template"""
-        return "<|start_header_id|>assistant<|end_header_id|> {assistant_response} <|eot_id|>"
+        return "<|start_header_id|>assistant<|end_header_id|>\n{assistant_response}<|eot_id|>"
 
     @property
     def assistant_template(self) -> str:
         """Assistant response placeholder"""
-        return "<|start_header_id|>assistant<|end_header_id|>"
+        return "<|start_header_id|>assistant<|end_header_id|>\n"

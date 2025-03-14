@@ -1,5 +1,5 @@
 """
-Sub class for Phi specifically created for Phi-4-mini-instruct
+Sub class for qwen specifically created for qwen2.5
 This inherits the base llm and implements the specific methods for Phi-4-mini-instruct
 
 First Version: 2025-Mar-13
@@ -9,7 +9,30 @@ from typing import List
 from .basellm import BaseLLM
 
 
-class PhiLocal(BaseLLM):
+QWEN_TOOL_CALLING_PROMPT: str = """
+You are an expert in function composition. Given a question and available Tools, determine the appropriate function/tool calls.
+
+If no function applies or parameters are missing, indicate that. Do not include extra text.
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+
+<tools>
+{functions_definition}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML 
+tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>
+"""
+
+
+class QwenLocal(BaseLLM):
     """
     A class to represent Phi local model for text generation.
 
@@ -36,7 +59,7 @@ class PhiLocal(BaseLLM):
         system_prompt: str = None,
         **kwargs,
     ):
-        _model = "microsoft/Phi-4-mini-instruct" if not model else model
+        _model = "Qwen/Qwen2.5-3B-Instruct" if not model else model
         super().__init__(_model, max_history, system_prompt, **kwargs)
         self.logger.debug("Default role of the AI assistant: %s", system_prompt)
 
@@ -44,28 +67,32 @@ class PhiLocal(BaseLLM):
     def special_tokens(self) -> List[str]:
         """Abstract property for special tokens that must be implemented in subclasses."""
         return [
-            "<|system|>",
-            "<|user|>",
-            "<|assistant|>",
-            "<|end|>",
+            "<|im_start|>",
+            "<|im_end|>",
+            "<|endoftext|>",
         ]
 
     @property
     def system_template(self) -> str:
         """System message template"""
-        return "<|system|>{system_prompt}<|end|>"
+        return "<|im_start|>system\n{system_prompt}<|im_end|>"
 
     @property
     def user_turn_template(self) -> str:
         """User turn template"""
-        return "<|user|>{user_prompt}<|end|>"
+        return "<|im_start|>user\n{user_prompt}<|im_end|>"
 
     @property
     def assistant_turn_template(self) -> str:
         """Assistant turn template"""
-        return "<|assistant|>{assistant_response}<|end|>"
+        return "<|im_start|>assistant\n{assistant_response}<|im_end|>"
 
     @property
     def assistant_template(self) -> str:
         """Assistant response placeholder"""
-        return "<|assistant|>"
+        return "<|im_start|>assistant\n"
+
+    @property
+    def tool_calling_prompt(self) -> str:
+        """Tool calling prompt"""
+        return QWEN_TOOL_CALLING_PROMPT
