@@ -410,7 +410,7 @@ class BaseLLM(ABC):
 
         # Construct prompt with role-play personas
         system_instruction = (
-            f"You are in a group chatt. Your assigned role is {role}. Always respond in the {role} persona conceisly.\n\n"
+            f"You are in a group chat. Your assigned role is {role}. Always respond in the {role} persona conceisly.\n\n"
             f"Here are the personas for each role:\n\n"
         )
         for persona_role, persona in role_persona_map.items():

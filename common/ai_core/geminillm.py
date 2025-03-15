@@ -5,6 +5,7 @@ This inherits the base llm and implements the specific methods for gemini
 First Version: 2025-Mar-14
 """
 
+from dataclasses import dataclass
 import os
 import time
 from typing import List, Dict, Any, Union
@@ -15,7 +16,17 @@ from google.genai import types
 from .basellm import BaseLLM, Role, RolePlay
 
 
-class GemmaLocal(BaseLLM):
+# Creating dataclass
+@dataclass
+class Tokenizer:
+    """
+    Dataclass for Tokenizer, This is created to comply with base class rule
+    """
+
+    pad_token_id: int = 1997
+
+
+class GeminiApi(BaseLLM):
     """
     A class to represent Gemini API for text generation.
 
@@ -55,26 +66,20 @@ class GemmaLocal(BaseLLM):
         """
         self.logger.info("Initializing gemini API...")
         try:
-            self.tokenizer: Dict = {}
+            self.tokenizer: Tokenizer = Tokenizer()
             self.model = model
             self.gen_ai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
             self.chat_client = self.gen_ai_client.chats.create(model=self.model)
         except Exception as e:
             self.logger.error("Error consiguring model '%s': %s", model, e)
             raise RuntimeError(f"Failed to Configure model '{model}'") from e
-        
-    
-    def _create_config_from_kwargs(self, max_output_tokens=None, **kwargs):
-        # Mapping of expected alternative argument names
-        mapping = {
-            "stop_strings": "stop_sequences",
-        }
 
-        # Prepare data for GenerateContentConfig
-        config_data = {
-            key: kwargs.get(value, kwargs.get(key))
-            for key, value in mapping.items()
-        }
+    def _create_config_from_kwargs(self, max_output_tokens=None, **kwargs):
+
+        config_data = {}
+
+        if "stop_strings" in kwargs:
+            config_data["stop_sequences"] = kwargs["stop_strings"].split(",")
 
         # Explicitly handle max_output_tokens
         if max_output_tokens is not None:
@@ -113,12 +118,9 @@ class GemmaLocal(BaseLLM):
         str or list[str]
             The generated text. if the input is a list, the output will be a list.
         """
-        # Pass all input arguments to GenerateContentConfig 
+        # Pass all input arguments to GenerateContentConfig
         _max_tokens = max_new_tokens or self.token_limit
         config = self._create_config_from_kwargs(max_new_tokens=_max_tokens, **kwargs)
-        
-        if isinstance(prompt, str):
-            prompt = [prompt]
 
         self.logger.info("Generating response for prompt: %s", prompt)
         try:
@@ -255,7 +257,9 @@ class GemmaLocal(BaseLLM):
             chat_history = self.history
 
         # Converting chat_history to Gemini API format
-        transformed_history, system_instruction = self.transform_history_for_gemini(chat_history, prompt)
+        transformed_history, system_instruction = self.transform_history_for_gemini(
+            history=chat_history, user_prompt=prompt
+        )
 
         # Generate response
         generated_response = self.generate_text(
@@ -304,6 +308,7 @@ class GemmaLocal(BaseLLM):
         if chat_history:
             chat_history = self.trim_conversation(chat_history, self.context_length)
         user_input = chat_history.pop()["content"] if not prompt else prompt
+        print(f"User Input: {user_input}")
         return self.chat(
             user_input, chat_history=chat_history, stateless=True, **kwargs
         )
@@ -380,8 +385,14 @@ class GemmaLocal(BaseLLM):
 
         return {"response": model_response, "chat_history": _messages}
     
-    def transform_history_for_gemini(history, user_prompt:str = None):
+    def get_token_count(self, text: str) -> int:
+        """Approximates token count by splitting text on spaces."""
+        return len(text.split()) if text else 0
+
+    def transform_history_for_gemini(self, history, user_prompt: str = None):
         """Transform the conversation history into the format expected by Google Gemini API."""
+        print("Transforming history for Gemini")
+        print("History: ", history)
         transformed_history = []
         _system_instruction = None
         for message in history:
@@ -390,182 +401,14 @@ class GemmaLocal(BaseLLM):
                 continue
             transformed_message = {
                 "role": message["role"],
-                "parts": [
-                    {
-                        "text": message["content"]
-                    }
-                ]
+                "parts": [{"text": message["content"]}],
             }
             transformed_history.append(transformed_message)
         if user_prompt:
             transformed_history.append(
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "text": user_prompt
-                        }
-                    ]
-                }
+                {"role": "user", "parts": [{"text": user_prompt}]}
             )
         return transformed_history, _system_instruction
-
-    def format_prompt(
-        self,
-        prompt: str,
-        system_prompt: str = None,
-        tools_schema: str = None,
-        documents: List[Dict] = None,
-        create_chat_session: bool = False,
-        chat_history: List[Dict] = None,
-    ) -> str:
-        """
-        Formats the prompt using the prompt template, handling chat history,
-        tools, system prompts, and document-based context.
-        """
-
-        system_prompt = system_prompt or self.system_prompt
-
-        # Handle chat history formatting
-        if chat_history:
-            return self._format_chat_history(prompt, chat_history)
-
-        # Create new chat session formatting
-        elif create_chat_session:
-            return self._format_new_chat_session(prompt, system_prompt)
-
-        # Format prompt for tool usage
-        elif tools_schema:
-            return self._format_tools(prompt, tools_schema)
-
-        # Format prompt for RAG (Retrieval-Augmented Generation)
-        elif documents:
-            return self._format_documents(prompt, documents)
-
-        # Default formatting (with or without system prompt)
-        return self._format_default_prompt(prompt, system_prompt)
-
-    def _format_chat_history(self, prompt: str, chat_history: List[Dict]) -> str:
-        """
-        Formats the prompt including chat history, ensuring system messages are considered.
-        """
-        self.logger.debug("Formatting prompt with chat history")
-
-        final_prompt: str = self.bos_token
-
-        # Extract system prompt from chat history (if present)
-        system_prompt = next(
-            (
-                msg["content"]
-                for msg in chat_history
-                if msg["role"] == Role.SYSTEM.value
-            ),
-            None,
-        )
-        if system_prompt:
-            final_prompt += (
-                f"\n{self.system_template.format(system_prompt=system_prompt)}"
-            )
-
-        # Format user and assistant exchanges
-        for msg in chat_history:
-            if msg["role"] == Role.USER.value:
-                final_prompt += (
-                    f"\n{self.user_turn_template.format(user_prompt=msg['content'])}"
-                )
-            elif msg["role"] == Role.ASSISTANT.value:
-                final_prompt += f"\n{self.assistant_turn_template.format(assistant_response=msg['content'])}"
-
-        # Append current user prompt and assistant placeholder
-        final_prompt += f"\n{self.user_turn_template.format(user_prompt=prompt)}"
-        final_prompt += f"\n{self.assistant_template}"
-
-        return final_prompt
-
-    def _format_new_chat_session(self, prompt: str, system_prompt: str) -> str:
-        """
-        Formats the prompt for a new chat session, ensuring the BOS token is set.
-        """
-        self.logger.debug("Formatting prompt for new chat session")
-
-        final_prompt = self.bos_token
-        if system_prompt:
-            final_prompt += (
-                f"\n{self.system_template.format(system_prompt=system_prompt)}"
-            )
-
-        final_prompt += f"\n{self.user_turn_template.format(user_prompt=prompt)}"
-        final_prompt += f"\n{self.assistant_template}"
-
-        return final_prompt
-
-    def _format_tools(self, prompt: str, tools_schema: str) -> str:
-        """
-        Formats the prompt when tools (functions) are available.
-        """
-        self.logger.debug("Formatting prompt with tool schema")
-
-        try:
-            system_prompt = self.tool_calling_prompt.format(
-                functions_definition=tools_schema
-            )
-        except Exception as e:
-            self.logger.error("Error formatting tool schema: %s", e)
-            system_prompt = self.tool_calling_prompt.replace(
-                "{functions_definition}", tools_schema
-            )
-        return self.tools_prompt_template.format(
-            system_prompt=system_prompt, user_prompt=prompt
-        )
-
-    def _format_documents(self, prompt: str, documents: List[Dict]) -> str:
-        """
-        Formats the prompt to include relevant document context.
-        """
-        self.logger.debug("Formatting prompt with documents")
-
-        required_keys = {"reference", "content"}
-        assert all(
-            required_keys.issubset(doc.keys()) for doc in documents
-        ), "Documents must contain 'reference' and 'content' keys."
-
-        formatted_documents = "\n".join(
-            f"**Document {doc.get('reference', 'No Reference available')}**: {doc.get('content', 'No Content available in this document - SKIP THIS')}"
-            for doc in documents
-        )
-
-        try:
-            system_prompt = self.rag_prompt.format(
-                documents=formatted_documents, question=prompt
-            )
-        except Exception as e:
-            self.logger.error("Error formatting RAG prompt: %s", e)
-            system_prompt = self.rag_prompt.replace(
-                "{documents}", formatted_documents
-            ).replace("{question}", prompt)
-
-        return self.rag_prompt_template.format(
-            system_prompt=system_prompt, user_prompt=prompt
-        )
-
-    def _format_default_prompt(self, prompt: str, system_prompt: str) -> str:
-        """
-        Default prompt formatting when no chat history, tools, or documents are provided.
-        """
-        self.logger.debug("Formatting default prompt")
-
-        if system_prompt:
-            return self.default_prompt_template.format(
-                system_prompt=system_prompt, user_prompt=prompt
-            )
-
-        return self.non_sys_prompt_template.format(user_prompt=prompt)
-
-    def get_token_count(self, text: str) -> int:
-        """
-        Gets the token count of the given text.
-        """
-        return "NOT IMPLEMENTED"
 
     @property
     def special_tokens(self) -> List[str]:
@@ -581,7 +424,7 @@ class GemmaLocal(BaseLLM):
     @property
     def bos_token(self) -> str:
         """Abstract property for BOS token that must be implemented in subclasses."""
-        return "<bos>"
+        return ""
 
     @property
     def system_template(self) -> str:
