@@ -10,71 +10,23 @@ from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 import logging
-import os
-from typing import List, Dict, Any, Union
+from pydantic import BaseModel, Field
+import re
+from typing import List, Dict, Any, Union, Optional, Callable
 import time
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-RAG_PROMPT: str = """
-You are an advanced AI assistant with expertise in retrieving and synthesizing information from provided references. 
-Analyze the given documents and answer the question based strictly on their content.
-
-## Context:
-You will receive multiple documents, each with a unique identifier. Responses should be derived only from the given documents while maintaining clarity and conciseness. If insufficient information is available, state it explicitly.
-
-## Instructions:
-1. **Extract information** only from provided documents.
-2. **Cite references** using document identifiers.
-3. **Ensure coherence** when summarizing multiple sources.
-4. **Avoid speculation** or external knowledge.
-5. **State uncertainty** if the answer is unclear.
-
-## Expected Output:
-- A **concise and accurate** response with relevant citations.
-- A disclaimer if the answer is unavailable.
-
-## Documents:
-{documents}
-
-## User's Question:
-{question}
-"""
-
-TOOL_CALLING_PROMPT: str = """
-You are an expert in function composition. Given a question and available functions, determine the appropriate function/tool calls.
-
-If a function is applicable, return it in the format:
-[func_name1(param1=value1, param2=value2...), func_name2(params)]
-
-If no function applies or parameters are missing, indicate that. Do not include extra text.
-
-## Available Functions:
-{functions_definition}
-"""
-
-
-# Creating a Dataclass for roleplay
-@dataclass
-class RolePlay:
-    """
-    Dataclass for roleplay.
-    """
-
-    role: str
-    persona: str
-
-
-# Creating enum class for the roles
-class Role(Enum):
-    """
-    Enum class for roles.
-    """
-
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
+from .utils import (
+    Role,
+    RolePlay,
+    ChatMessage,
+    Document,
+    RAG_PROMPT,
+    TOOL_CALLING_PROMPT,
+    BRAINSTROM_TURN_PROMPT,
+)
 
 
 # Creating a base class for the models,
@@ -82,6 +34,41 @@ class Role(Enum):
 class BaseLLM(ABC):
     """
     Abstract base class for LLM models, defining common functionality.
+
+    This class provides a common interface for interacting with different
+    language models, handling tokenization, generation, chat history, and
+    prompt formatting.  It's designed to be subclassed for specific models.
+
+    Args:
+        model (str): The name or path of the pre-trained model to load.
+        max_history (int, optional): The maximum number of conversation turns
+            to store in the history. Defaults to 25.
+        system_prompt (str, optional):  A system prompt to provide initial
+            instructions to the model. Defaults to "".
+        context_length (int, optional): The maximum context length supported by the model.
+             Defaults to 8192.
+        token_limit (int, optional):  The maximum number of tokens for generation.
+            Defaults to 4096.
+        **kwargs: Additional keyword arguments passed to the
+            `transformers.AutoTokenizer` and `transformers.AutoModelForCausalLM`
+            constructors.  This can include parameters like `device_map`, etc.
+
+    Attributes:
+        logger (logging.Logger): Logger instance for the class.
+        system_prompt (str): The system prompt.
+        max_history (int): The maximum number of conversation turns to store.
+        context_length (int): The model's context length.
+        token_limit (int): The token generation limit.
+        history (List[Dict[str, str]]): List to store conversation history.
+            Each element is a dictionary with "role" and "content" keys.
+        _role_play_configs (List[RolePlay]):  Configuration for role-playing.
+        tokenizer (transformers.PreTrainedTokenizer): Tokenizer for the model.
+        model (transformers.PreTrainedModel): The loaded language model.
+        _rag_prompt (str):  Prompt template for Retrieval Augmented Generation. Loaded from environment variable RAG_PROMPT if set, otherwise it is None.
+        _tool_calling_prompt (str): Prompt template for tool calling. Loaded from environment variable TOOL_CALLING_PROMPT if set, otherwise it is None
+
+    Example:
+        >>> model = BaseLLM("model-name")
     """
 
     def __init__(
@@ -99,25 +86,50 @@ class BaseLLM(ABC):
         self.context_length = context_length
         self.token_limit = token_limit
         self.history: List[Dict[str, str]] = []
-        self._role_play_configs: List[RolePlay] = []
+        self._role_play_configs: Optional[List[RolePlay]] = []
 
         # Load model and tokenizer
         self.tokenizer = None
         self.model = None
-        self._rag_prompt = os.getenv("RAG_PROMPT", RAG_PROMPT)
-        self._tool_calling_prompt = os.getenv(
-            "TOOL_CALLING_PROMPT", TOOL_CALLING_PROMPT
-        )
+        self._rag_prompt = RAG_PROMPT
+        self._tool_calling_prompt = TOOL_CALLING_PROMPT
+        self._brainstorm_turn_prompt = BRAINSTROM_TURN_PROMPT
         self._load_model_and_tokenizer(model, **kwargs)
 
         # Check if the tokenizer has a pad token and set it to eos_token if not
         # This is specially needed for Llama models
-        if self.tokenizer.pad_token_id is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        try:
+            if self.tokenizer.pad_token_id is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+        except AttributeError:
+            self.logger.warning(
+                "Tokenizer does not have a pad_token_id attribute. Skipping setting pad_token."
+            )
 
     def _load_model_and_tokenizer(self, model: str, **kwargs) -> None:
         """
-        Loads the tokenizer and model.
+        Internal method to initialize and load the tokenizer and language model from a specified Hugging Face checkpoint.
+
+        Args:
+            model (str): Identifier or path to the pre-trained model to load.
+            **kwargs: Additional keyword arguments passed directly to Hugging Face's `from_pretrained` methods.
+
+        Raises:
+            RuntimeError: If model or tokenizer loading fails due to invalid configurations, missing files, or hardware compatibility issues.
+
+        Side-effects:
+            - Loads model and tokenizer into memory.
+            - Moves the model to the configured device (CPU/GPU).
+            - Sets tokenizer's padding token if missing (uses EOS token).
+
+        Example:
+            >>> self._load_model_and_tokenizer("meta-llama/Llama-2-7b-chat-hf")
+            # Logs:
+            # "Initializing tokenizer and model..."
+            # "Loaded model: meta-llama/Llama-2-7b-chat-hf"
+            # "Model type: LlamaForCausalLM"
+            # "Number of parameters: 7,000,000,000"
+            # "Device: cuda"
         """
         self.logger.info("Initializing tokenizer and model...")
         try:
@@ -145,27 +157,27 @@ class BaseLLM(ABC):
         **kwargs,
     ) -> Union[List[str], str]:
         """
-        Generates text based on the given prompt.
+        Generates text completion from the given prompt(s).
 
-        Parameters:
-        ----------
-        prompt : str or list[str]
-            The prompt text to generate text from.
-        max_new_tokens : int, optional
-            The maximum length of the generated text.
-        skip_special_tokens : bool, optional
-            Flag to indicate if special tokens should be skipped (default is True).
+        Args:
+            prompt (Union[List[str], str]): Single or list of prompts to generate responses for.
+            max_new_tokens (int, optional): Maximum number of new tokens to generate. Defaults to class token limit.
+            skip_special_tokens (bool, optional): Excludes special tokens (like <EOS>) from the output. Defaults to True.
+            **kwargs: Additional generation parameters passed to the underlying model.
 
         Returns:
-        -------
-        str or list[str]
-            The generated text. if the input is a list, the output will be a list.
+            Union[List[str], str]: Generated text(s), returned as a single string if input was a string, or a list if input was a list.
+
+        Example:
+            >>> result = llm.generate_text("What is AI?")
+            >>> print(result)
+            "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines..."
         """
         _max_tokens = max_new_tokens or self.token_limit
-        if isinstance(prompt, str):
-            prompt = [prompt]
+        print("Running inference for prompt: ", prompt)
+        _prompt = prompt if isinstance(prompt, list) else [str(prompt)]
 
-        self.logger.info("Generating response for prompt: %s", prompt)
+        self.logger.info("Generating response for prompt: %s", _prompt)
         try:
             with torch.inference_mode():
                 self.logger.debug("Tokenizing prompt: %s", prompt)
@@ -175,7 +187,6 @@ class BaseLLM(ABC):
                 model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
 
                 _start_time = time.time()
-                print(f"Generating response for prompt: \n\n {prompt} \n\n")
                 generated_ids = self.model.generate(
                     **model_inputs,
                     max_new_tokens=_max_tokens,
@@ -210,40 +221,72 @@ class BaseLLM(ABC):
         prompt: str,
         system_prompt: str = None,
         tools_schema: str = None,
-        documents: List[Dict] = None,
+        documents: Optional[List[Union[Document, Dict[str, Any]]]] = None,
         create_chat_session: bool = False,
-        chat_history: List[Dict] = None,
+        chat_history: Optional[List[Union[ChatMessage, Dict[str, str]]]] = None,
         max_new_tokens: int = None,
         skip_special_tokens: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Generates text based on the given prompt.
+        Generates a structured and contextualized response from the model, optionally guided by system prompts,
+        schemas, document contexts (RAG), and previous conversation history.
 
-        Parameters:
-        ----------
-        prompt : str
-            The prompt text to generate text from.
-        system_prompt : str, optional
-            The system prompt text (default is None).
-        tools_schema : str, optional
-            The schema for the tools prompt (default is None).
-        documents : list, optional
-            The list of documents for the RAG prompt (default is None).
-        create_chat_session : bool, optional
-            Flag to indicate if a chat session should be created (default is False).
-        chat_history : list, optional
-            The chat history for the prompt (default is None).
-        max_new_tokens : int, optional
-            The maximum length of the generated text.
-        skip_special_tokens : bool, optional
-            Flag to indicate if special tokens should be skipped (default is False).
+        Args:
+            prompt (str):
+                User's query or prompt to the model.
+            system_prompt (Optional[str]):
+                Optional high-level instructions or context to guide model responses.
+                Defaults to the internal class-defined prompt if None.
+            tools_schema (Optional[str]):
+                Schema definition for invoking structured tools or API calls through the model.
+                Defaults to None (no tool schema).
+            documents (Optional[List[Dict[str, Any]]]):
+                List of documents to provide context for Retrieval-Augmented Generation (RAG).
+                Each document is a dictionary structured per your RAG schema.
+                Defaults to None.
+            create_chat_session (bool):
+                Indicates if this response should initiate a new conversational session context.
+                Defaults to False.
+            chat_history (Optional[List[Union[ChatMessage, Dict[str, str]]]]):
+                Previous messages forming the conversation context, provided as a list of either:
+                    - ChatMessage objects, or
+                    - Dictionaries with keys 'role' (user/assistant/system) and 'content'.
+                Defaults to None.
+            max_new_tokens (Optional[int]):
+                Maximum number of tokens to generate in the response.
+                Defaults to class-configured token limit if None.
+            skip_special_tokens (bool):
+                If True, omits special tokens from the output.
+                Defaults to False.
+            **kwargs:
+                Additional keyword arguments for fine-tuning model inference parameters.
 
         Returns:
-        -------
-        dict
-            The response and chat history.
-            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
+            Dict[str, Any]:
+                A dictionary containing:
+                    - 'response' (str): The model-generated response.
+                    - 'chat_history' (List[ChatMessage]): Updated conversation history including this interaction.
+
+        Example:
+            >>> response = llm.generate_response(
+            ...     prompt="Explain relativity simply.",
+            ...     system_prompt="You are an experienced science communicator.",
+            ...     chat_history=[
+            ...         {"role": "user", "content": "Hi there!"},
+            ...         {"role": "assistant", "content": "Hello! How can I help?"}
+            ...     ],
+            ... )
+            >>> print(response["response"])
+            "Relativity explains how space and time are linked, showing that motion and gravity affect how we perceive time and distances."
+
+        Raises:
+            ValidationError:
+                Raised by Pydantic if provided chat history inputs don't conform to the required schema.
+
+        Notes:
+            - Input messages are automatically validated and converted into `ChatMessage` instances if provided as dictionaries.
+            - It's recommended to use clear, concise system prompts to guide the model's behavior effectively.
         """
         _chat_history = []
 
@@ -278,26 +321,51 @@ class BaseLLM(ABC):
     def chat(
         self,
         prompt: str,
-        chat_history: List[Dict] = None,
+        chat_history: Optional[List[ChatMessage]] = None,
         clear_session: bool = False,
         stateless: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Chat with the model.
+        Initiates or continues a conversational interaction with stateful or stateless mode.
 
-        Parameters:
-        ----------
-        prompt : str
-            The user prompt.
-        clear_session : bool, optional
-            Flag to indicate if the session history should be cleared (default is False).
+        Args:
+            prompt (str):
+                User input or question for the model.
+            chat_history (Optional[List[ChatMessage]]):
+                A list of prior conversation messages, each clearly defined with:
+                    - role: Role Enum (user, assistant, system).
+                    - content: Message content as a string.
+                If omitted, the internal conversation history is used or initialized fresh.
+            clear_session (bool):
+                If `True`, clears existing internal conversation history before this interaction.
+            stateless (bool):
+                If `True`, prevents modifying internal conversation state, useful for isolated queries.
+            **kwargs:
+                Additional parameters for model inference.
 
         Returns:
-        -------
-        dict
-            The response and chat history.
-            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
+            Dict[str, Any]:
+                A dictionary containing:
+                    - response (str): Model-generated reply.
+                    - chat_history (List[ChatMessage]): Updated history including the latest interaction.
+
+        Example:
+            >>> response = llm.chat(
+            ...     prompt="Tell me about space exploration.",
+            ...     chat_history=[
+            ...         ChatMessage(role=Role.USER, content="Hi"),
+            ...         ChatMessage(role=Role.ASSISTANT, content="Hello! What can I help you with today?")
+            ...     ],
+            ...     clear_session=False,
+            ...     stateless=False
+            ... )
+            >>> print(response["response"])
+            "Space exploration involves the discovery of celestial structures and the exploration of outer space using spacecraft."
+
+        Notes:
+            - Messages provided must adhere to the ChatMessage schema.
+            - Internal history management can be explicitly controlled using `clear_session` and `stateless`.
         """
         _history_checker: bool = (
             True  # flag to see if the chat history is passed, so we can return the chat history in the response without affecting original
@@ -346,24 +414,40 @@ class BaseLLM(ABC):
     def stateless_chat(
         self,
         prompt: str = "",
-        chat_history: List[Dict[str, str]] = None,
+        chat_history: Optional[List[ChatMessage]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Chat with the model in a stateless manner.
+        Generates a stateless model response based solely on provided input and optional context, without affecting internal state.
 
-        Parameters:
-        ----------
-        prompt : str, optional
-            The user prompt. if user prompt is not provided, the last user input from chat history will be used (default is "").
-        chat_history : list, optional
-            The chat history for the prompt (default is None).
+        Args:
+            prompt (str):
+                The prompt to generate a response for. If omitted, the last user message from `chat_history` is used.
+            chat_history (Optional[List[ChatMessage]]):
+                Conversation context as a list of `ChatMessage` instances. Ensures context-aware responses.
+            **kwargs:
+                Additional keyword arguments for model inference.
 
         Returns:
-        -------
-        dict
-            The response and chat history.
-            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
+            Dict[str, Any]:
+                Dictionary with:
+                    - response (str): Generated reply.
+                    - chat_history (List[ChatMessage]): The provided context extended with this interaction.
+
+        Example:
+            >>> response = llm.stateless_chat(
+            ...     prompt="What's the highest mountain?",
+            ...     chat_history=[
+            ...         ChatMessage(role=Role.USER, content="Hello"),
+            ...         ChatMessage(role=Role.ASSISTANT, content="Hi there, how can I help?")
+            ...     ],
+            ... )
+            >>> print(response["response"])
+            "Mount Everest is the highest mountain on Earth."
+
+        Notes:
+            - Ideal for one-off queries or interactions requiring context without persistent changes.
+            - The internal session history remains untouched.
         """
         if not prompt and not chat_history:
             return {"response": "No prompt provided", "chat_history": []}
@@ -374,71 +458,237 @@ class BaseLLM(ABC):
             user_input, chat_history=chat_history, stateless=True, **kwargs
         )
 
-    def multi_role_chat(
+    def brainstrom(
         self,
         messages: List[Dict[str, str]],
-        role: str,
-        role_play_configs: List[RolePlay] = None,
+        role: str = "",
+        role_play_configs: Optional[List[Union[RolePlay, Dict[str, str]]]] = None,
+        ai_assisted_turns: int = 0,
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Chat with the model in a multi-role manner.
+        Facilitates a multi-role chat interaction, enabling the model to respond based on specified personas and role configurations.
 
-        Parameters:
-        ----------
-        messages : List[Dict[str, str]]
-            The list of messages with 'role' and 'content' keys.
-        role : str
-            The Role for the Ai assistant.
-        role_play_configs : List[RolePlay], optional
-            The list of role-play configurations (default is None).
+        Args:
+            messages (List[Dict[str, str]]):
+                A chronological list of messages exchanged, each message is represented as a dictionary with:
+                    - 'role' (str): The role name of the sender.
+                    - 'content' (str): The message content.
+            role (str):
+                The specific role for the model to adopt in this chat turn (e.g., 'manager', 'client', 'developer').
+                Defaults to an empty string. if this is empty, the model will generate the next response based on the in the chat history and role_play_configs.
+            role_play_configs (Optional[List[Union[RolePlay, Dict[str, str]]]]):
+                Optional configurations for role-playing scenarios, specifying personas associated with roles. Each item can be a `RolePlay` instance or a dictionary conforming to:
+                    - role (str): Name of the role.
+                    - persona (str): Description of the associated personality traits.
+                If not provided, the instance's default role-play configurations are used.
+            ai_assisted_turns (int):
+                Number of AI-assisted turns to generate in the conversation. Defaults to 0.
+                If Provided The model will generate the next `ai_assisted_turns` responses based on the provided messages and the model will choose who will chat next.
+            **kwargs:
+                Additional parameters for model inference and generation.
 
         Returns:
-        -------
-        dict
-            The response and chat history.
-            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
+            Dict[str, Any]:
+                A dictionary containing:
+                    - 'response' (str): The generated response based on the assigned role and persona.
+                    - 'chat_history' (List[Dict[str, str]]): Updated message history, including the new response appended.
+
+        Raises:
+            pydantic.ValidationError:
+                If the provided `role_play_configs` dictionaries don't match the required schema.
+
+        Example:
+            >>> messages = [
+            ...     {"role": "Dee", "content": "Team, we have a new feature request from Britney. Let's discuss the feasibility and timeline."},
+            ...     {"role": "Britney", "content": "Yes, I want to add an **advanced search feature** to our platform. Users are struggling to find relevant items quickly."},
+            ...     {"role": "Venkat", "content": "That sounds interesting. Britney, do you have any specific filters in mind? Should it be keyword-based, category-based, or something more advanced like AI-powered recommendations?"},
+            ... ]
+            >>> role_play_configs = [
+            ...     {"role": "Britney", "persona": "A business client who values user experience and is focused on solving real-world problems for customers."},
+            ...     {"role": "Venkat", "persona": "A skilled developer with deep technical expertise. He prioritizes efficiency, clean code, and optimal system design."},
+            ...     {"role": "John", "persona": "A detail-oriented tester who thrives on finding edge cases and ensuring product stability."},
+            ...     {"role": "Dee", "persona": "A meticulous and strategic manager who ensures projects run smoothly. He focuses on business goals, deadlines, and resource allocation."},
+            ... ]
+            >>> response = base_llm.multi_role_chat(
+            ...     messages=messages,
+            ...     role="John",
+            ...     role_play_configs=role_play_configs
+            ... )
+            >>> print(response["response"])
+            From a testing perspective, we need to ensure the search results are accurate. Venkat, how complex will the AI recommendations be? We might need test cases for various user behaviors.
+
+        Notes:
+            - Clients can directly provide dictionaries instead of `RolePlay` instances; these will be automatically validated and converted by Pydantic.
+            - Ensure the provided `role` matches one of the roles specified in `role_play_configs` to get the desired persona-based response.
         """
 
-        role_play_configs = role_play_configs or self.role_play_configs
+        def format_roles_personas(role_configs: List[RolePlay]) -> str:
+            """Formats role configurations into a readable string."""
+            return "\n".join(f"- {r.role}: {r.persona}" for r in role_configs)
 
-        # Extract unique roles from messages
-        available_roles = {rp.role for rp in role_play_configs}
+        def format_conversation_history(history: List[Dict[str, str]]) -> str:
+            """Formats the conversation history into a string suitable for model input."""
+            role_content_list = [f">> {entry['role']}: {entry['content']}" for entry in history]
+            role_content = "\n".join(role_content_list)
+            role_content += '\n\n---\nThe Last speaker is '+history[-1]["role"] if role_content_list else ""
+            return role_content
 
-        # Get the persona for each role in messages
-        role_persona_map = {rp.role: rp.persona for rp in role_play_configs}
+        def format_prompt_for_next_role(
+            role_configs: List[RolePlay], history: List[Dict[str, str]]
+        ) -> str:
+            """Formats the prompt used to determine the next role."""
+            return self._brainstorm_turn_prompt.format(
+                roles_personas=format_roles_personas(role_configs),
+                conversation_history=format_conversation_history(history),
+            )
 
-        # Construct prompt with role-play personas
-        system_instruction = (
-            f"You are in a group chat. Your assigned role is {role}. Always respond in the {role} persona conceisly.\n\n"
-            f"Here are the personas for each role:\n\n"
+        def validate_role_configs(
+            configs: List[Union[RolePlay, Dict[str, str]]],
+        ) -> List[RolePlay]:
+            """Validates and converts role-play configurations."""
+            try:
+                return [
+                    RolePlay(**config) if isinstance(config, dict) else config
+                    for config in configs
+                ]
+            except Exception as e:
+                raise ValueError(
+                    f"Invalid role-play configuration: {e}. Ensure valid RolePlay instances or dictionaries."
+                )
+
+        role_play_configs = validate_role_configs(
+            role_play_configs or self.role_play_configs
         )
-        for persona_role, persona in role_persona_map.items():
-            system_instruction += f"- {persona_role}: {persona}\n\n"
+        available_roles = [rp.role for rp in role_play_configs]
 
-        chat_history = self.trim_conversation(messages, self.context_length)
+        chat_history = messages.copy()
 
-        # Preparing messages for the chat option
-        chat_input = [{"role": Role.SYSTEM.value, "content": system_instruction}]
+        for _ in range(max(ai_assisted_turns, 1)):
+            current_role = role or self._determine_next_role(
+                chat_history,
+                available_roles,
+                format_prompt_for_next_role,
+                role_play_configs=role_play_configs,
+            )
 
-        for message in chat_history:
-            _content = message["role"] + ": " + message["content"]
-            if message["role"] == role:
-                chat_input.append({"role": Role.ASSISTANT.value, "content": _content})
-            else:
-                chat_input.append({"role": Role.USER.value, "content": _content})
+            system_instruction = (
+                f"You are in a group chat. Act as {current_role}.\n"
+                f"Try to keep your response concise and aligned with your persona\n"
+                f"your persona: {next(rp.persona for rp in role_play_configs if rp.role == current_role)}\n"
+                f"Following are the information about the other people and their personas in the group chat:\n"
+                f"{format_roles_personas([rp for rp in role_play_configs if rp.role != current_role])}\n"
+            )
 
-        chat_response = self.stateless_chat(chat_history=chat_input, **kwargs)
-        model_response = chat_response.get("response", "Error generating response").strip()
+            trimmed_history = self.trim_conversation(chat_history, self.context_length)
 
-        # Removing Role Tokens from the response
-        for roles in available_roles:
-            model_response = model_response.replace(roles + ":", "", 1) if model_response.startswith(roles + ":") else model_response
-        # Append the model response to the chat history
-        _messages = messages.copy()
-        _messages.append({"role": role, "content": model_response})
+            chat_input = [{"role": Role.SYSTEM.value, "content": system_instruction}]
 
-        return {"response": model_response, "chat_history": _messages}
+            for message in trimmed_history:
+                prefix: str = f"{message['role']}: "
+                chat_input.append(
+                    {
+                        "role": (
+                            Role.ASSISTANT.value
+                            if message["role"] == current_role
+                            else Role.USER.value
+                        ),
+                        "content": prefix + message["content"],
+                    }
+                )
+
+            chat_response: Dict[str, Any] = self.stateless_chat(
+                chat_history=chat_input, **kwargs
+            )
+            model_response: str = chat_response.get(
+                "response", "Error generating response"
+            ).strip()
+
+            # Clean up the response
+            for r in available_roles:
+                if model_response.startswith(f"{r}:"):
+                    model_response = model_response[len(r) + 1 :].strip()
+                    break
+
+            chat_history.append({"role": current_role, "content": model_response})
+
+            if not ai_assisted_turns:
+                break
+            role = ""  # Reset role for AI to decide next if looping
+
+        return {"response": model_response, "chat_history": chat_history}
+
+    def _extract_from_xml(self, response: str, tag: str) -> str:
+        """
+        Extracts content inside a specified XML-style tag from the AI response.
+
+        Args:
+            response (str): The AI's response containing the XML-style tag.
+            tag (str): The name of the XML tag to extract content from.
+
+        Returns:
+            str: The extracted content or None if not found.
+        """
+        pattern = rf"<{tag}>(.*?)</{tag}>"  # Dynamic regex pattern for any tag
+        match = re.search(pattern, response, re.IGNORECASE)
+        return match.group(1) if match else response
+
+    def _determine_next_role(
+        self,
+        messages: List[Dict[str, str]],
+        available_roles: List[str],
+        format_prompt_fn: Callable[[List[RolePlay], List[Dict[str, str]]], str],
+        role_play_configs: Optional[List[RolePlay]],
+        **kwargs: Any,
+    ) -> str:
+        """Determines the next role based on conversation history.
+
+        Args:
+            messages (List[Dict[str, str]]): Conversation history.
+            available_roles (List[str]): List of roles available for selection.
+            format_prompt_fn (Callable): Function to format prompts for determining next role.
+            **kwargs (Any): Additional parameters.
+
+        Returns:
+            str: Selected next role.
+        """
+        last_role = messages[-1]["role"]
+        if len(available_roles) == 2:
+            return next(role for role in available_roles if role != last_role)
+
+        next_role_prompt = format_prompt_fn(role_play_configs, messages)
+        self.logger.debug("Next role prompt: %s", next_role_prompt)
+
+        generated_role = self.generate_response(next_role_prompt, **kwargs)["response"]
+
+        generated_role = (
+            self._extract_from_xml(generated_role, "name").split(":")[0].strip()
+        )
+
+        if generated_role in available_roles:
+            return generated_role
+
+        self.logger.warning(
+            "Invalid role '%s' generated. Selecting next available role.",
+            generated_role,
+        )
+
+        try:
+            current_index = available_roles.index(last_role)
+            return available_roles[(current_index + 1) % len(available_roles)]
+        except Exception as e:
+            self.logger.error("Error determining next role: %s", e)
+            return available_roles[0]
+
+    def validate_chat_history(
+        self, chat_history: Optional[List[Union[ChatMessage, Dict]]]
+    ) -> List[ChatMessage]:
+        if not chat_history:
+            return []
+        return [
+            msg if isinstance(msg, ChatMessage) else ChatMessage(**msg)
+            for msg in chat_history
+        ]
 
     def get_token_count(self, text: str) -> int:
         """
@@ -449,7 +699,15 @@ class BaseLLM(ABC):
     # Method for getting the templates
     def get_templates(self) -> Dict[str, str]:
         """
-        Get the templates from the model.
+        Retrieves the dictionary of prompt templates used by the model.
+
+        Returns:
+            Dict[str, str]: A dictionary containing keys for different template types (e.g., 'user_turn_template', 'assistant_turn_template') and their corresponding template strings.
+
+        Example:
+            >>> templates = model.get_templates()
+            >>> print(templates["user_turn_template"])
+            "{role}: {content}\n"
         """
         return {
             "user_turn_template": self.user_turn_template,
@@ -474,8 +732,34 @@ class BaseLLM(ABC):
         chat_history: List[Dict] = None,
     ) -> str:
         """
-        Formats the prompt using the prompt template, handling chat history,
-        tools, system prompts, and document-based context.
+        Formats an input prompt by incorporating optional components such as system prompts, tool usage schemas, document context for retrieval-augmented generation (RAG), and chat history.
+
+        Args:
+            prompt (str): The primary input prompt or question provided by the user.
+            system_prompt (str, optional): A system-level instruction guiding model behavior. Defaults to class-level default.
+            tools_schema (str, optional): Schema defining available tools or APIs the model can invoke. Defaults to None.
+            documents (List[Union[Document, Dict[str, Any]]], optional): List of relevant documents providing additional context for RAG-based generation. Defaults to None.
+            create_chat_session (bool, optional): Flag indicating if a new chat session is to be created. Defaults to False.
+            chat_history (List[Dict[str, str]], optional): Previous conversation history for context awareness. Defaults to None.
+
+        Returns:
+            str: The fully formatted prompt ready to be used for model inference.
+
+        Example:
+            >>> formatted_prompt = self.format_prompt(
+            ...     prompt="Tell me about climate change impacts.",
+            ...     system_prompt="You are an expert environmental scientist.",
+            ...     documents=[
+            ...         {"id": "Climate Report 2023", "content": "Climate change impacts are accelerating..."},
+            ...     ],
+            ... )
+            >>> print(formatted_prompt)
+            You are an expert environmental scientist.
+
+            Relevant document:
+            Climate Report 2023: Climate change impacts are accelerating...
+
+            User: Tell me about climate change impacts.
         """
 
         system_prompt = system_prompt or self.system_prompt
@@ -503,20 +787,14 @@ class BaseLLM(ABC):
         self, conversation_history: List[Dict[str, str]], token_limit: int
     ) -> List[Dict[str, str]]:
         """
-        Trims the conversation history to fit within the given token limit,
-        while retaining system messages and accounting for their token count.
+        Trims conversation history based on token limits.
 
-        Parameters:
-        ----------
-        conversation_history : List[Dict[str, str]]
-            List of messages with 'role' and 'content' keys.
-        token_limit : int
-            The maximum allowed token count.
+        Args:
+            conversation_history (List[Dict[str, str]]): Full conversation history.
+            token_limit (int): Maximum allowable tokens.
 
         Returns:
-        -------
-        List[Dict[str, str]]
-            Trimmed conversation history.
+            List[Dict[str, str]]: Trimmed conversation history.
         """
         if not conversation_history or not isinstance(conversation_history, list):
             return []
@@ -570,11 +848,19 @@ class BaseLLM(ABC):
         ]
 
     def clear_history(self) -> None:
-        """Clears the stored conversation history."""
+        """
+        Clears the entire conversation history.
+        """
         self.history = []
 
     def add_to_history(self, user_input, model_response) -> None:
-        """Adds an interaction to history and maintains max history size."""
+        """
+        Adds entries to conversation history, respecting the maximum history limit.
+
+        Args:
+            user_input (str): Input provided by the user.
+            model_response (str): Response generated by the model.
+        """
         _user = {"role": Role.USER.value, "content": user_input}
         _assistant = {"role": Role.ASSISTANT.value, "content": model_response}
         self.history.extend([_user, _assistant])
@@ -589,13 +875,24 @@ class BaseLLM(ABC):
 
         final_prompt: str = self.bos_token
 
-        # Extract system prompt from chat history (if present)
+        try:
+            _chat_history: List[ChatMessage] = self.validate_chat_history(chat_history)
+        except Exception as e:
+            raise ValueError(f"Invalid chat history: {e}")
+
+        # Merge consecutive messages of the same role
+        merged_history = []
+        for msg in _chat_history:
+            if merged_history and merged_history[-1].role == msg.role:
+                merged_history[
+                    -1
+                ].content += f"\n\n {msg.content}"  # Merge with space separator
+            else:
+                merged_history.append(msg)
+
+        # Extract system prompt from merged history (if present)
         system_prompt = next(
-            (
-                msg["content"]
-                for msg in chat_history
-                if msg["role"] == Role.SYSTEM.value
-            ),
+            (msg.content for msg in merged_history if msg.role == Role.SYSTEM),
             None,
         )
         if system_prompt:
@@ -603,14 +900,18 @@ class BaseLLM(ABC):
                 f"\n{self.system_template.format(system_prompt=system_prompt)}"
             )
 
-        # Format user and assistant exchanges
-        for msg in chat_history:
-            if msg["role"] == Role.USER.value:
+        # Format user and assistant exchanges from merged history
+        for msg in merged_history:
+            if msg.role == Role.USER:
                 final_prompt += (
-                    f"\n{self.user_turn_template.format(user_prompt=msg['content'])}"
+                    f"\n{self.user_turn_template.format(user_prompt=msg.content)}"
                 )
-            elif msg["role"] == Role.ASSISTANT.value:
-                final_prompt += f"\n{self.assistant_turn_template.format(assistant_response=msg['content'])}"
+            elif msg.role == Role.ASSISTANT:
+                final_prompt += f"\n{self.assistant_turn_template.format(assistant_response=msg.content)}"
+            elif msg.role == Role.SYSTEM:
+                pass
+            else:
+                self.logger.warning("Unknown role in chat history: %s", msg.role)
 
         # Append current user prompt and assistant placeholder
         final_prompt += f"\n{self.user_turn_template.format(user_prompt=prompt)}"
@@ -660,14 +961,14 @@ class BaseLLM(ABC):
         """
         self.logger.debug("Formatting prompt with documents")
 
-        required_keys = {"reference", "content"}
-        assert all(
-            required_keys.issubset(doc.keys()) for doc in documents
-        ), "Documents must contain 'reference' and 'content' keys."
+        validated_documents: List[Document] = []
+        for doc in documents:
+            if not isinstance(doc, Document):
+                doc = Document(**doc)
+            validated_documents.append(doc)
 
         formatted_documents = "\n".join(
-            f"**Document {doc.get('reference', 'No Reference available')}**: {doc.get('content', 'No Content available in this document - SKIP THIS')}"
-            for doc in documents
+            f"**Document {doc.id }**: {doc.content}" for doc in validated_documents
         )
 
         try:
@@ -705,10 +1006,9 @@ class BaseLLM(ABC):
     @role_play_configs.setter
     def role_play_configs(self, configs: List[RolePlay]) -> None:
         """Sets the role-play configurations."""
-        assert all(
-            isinstance(config, RolePlay) for config in configs
-        ), "RolePlay configs must be of type RolePlay"
-        self._role_play_configs = configs
+        self._role_play_configs = [
+            RolePlay(**cfg) if isinstance(cfg, dict) else cfg for cfg in configs
+        ]
 
     @property
     def device(self) -> torch.device:

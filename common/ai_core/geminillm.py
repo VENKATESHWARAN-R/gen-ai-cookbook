@@ -96,7 +96,7 @@ class GeminiApi(BaseLLM):
 
     def generate_text(
         self,
-        prompt: Union[List[str], str],
+        prompt: str,
         max_new_tokens: int = None,
         skip_special_tokens: bool = True,
         **kwargs,
@@ -106,7 +106,7 @@ class GeminiApi(BaseLLM):
 
         Parameters:
         ----------
-        prompt : str or list[str]
+        prompt : str
             The prompt text to generate text from.
         max_new_tokens : int, optional
             The maximum length of the generated text.
@@ -280,110 +280,6 @@ class GeminiApi(BaseLLM):
             )
 
         return return_dict
-
-    def stateless_chat(
-        self,
-        prompt: str = "",
-        chat_history: List[Dict[str, str]] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """
-        Chat with the model in a stateless manner.
-
-        Parameters:
-        ----------
-        prompt : str, optional
-            The user prompt. if user prompt is not provided, the last user input from chat history will be used (default is "").
-        chat_history : list, optional
-            The chat history for the prompt (default is None).
-
-        Returns:
-        -------
-        dict
-            The response and chat history.
-            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
-        """
-        if not prompt and not chat_history:
-            return {"response": "No prompt provided", "chat_history": []}
-        if chat_history:
-            chat_history = self.trim_conversation(chat_history, self.context_length)
-        user_input = chat_history.pop()["content"] if not prompt else prompt
-        print(f"User Input: {user_input}")
-        return self.chat(
-            user_input, chat_history=chat_history, stateless=True, **kwargs
-        )
-
-    def multi_role_chat(
-        self,
-        messages: List[Dict[str, str]],
-        role: str,
-        role_play_configs: List[RolePlay] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """
-        Chat with the model in a multi-role manner.
-
-        Parameters:
-        ----------
-        messages : List[Dict[str, str]]
-            The list of messages with 'role' and 'content' keys.
-        role : str
-            The Role for the Ai assistant.
-        role_play_configs : List[RolePlay], optional
-            The list of role-play configurations (default is None).
-
-        Returns:
-        -------
-        dict
-            The response and chat history.
-            e.g. {"response": "Generated response", "chat_history": [{"role": "user", "content": "User input"}, ...]}
-        """
-
-        role_play_configs = role_play_configs or self.role_play_configs
-
-        # Extract unique roles from messages
-        available_roles = {rp.role for rp in role_play_configs}
-
-        # Get the persona for each role in messages
-        role_persona_map = {rp.role: rp.persona for rp in role_play_configs}
-
-        # Construct prompt with role-play personas
-        system_instruction = (
-            f"You are in a group chatt. Your assigned role is {role}. Always respond in the {role} persona conceisly.\n\n"
-            f"Here are the personas for each role:\n\n"
-        )
-        for persona_role, persona in role_persona_map.items():
-            system_instruction += f"- {persona_role}: {persona}\n\n"
-
-        chat_history = self.trim_conversation(messages, self.context_length)
-
-        # Preparing messages for the chat option
-        chat_input = [{"role": Role.SYSTEM.value, "content": system_instruction}]
-
-        for message in chat_history:
-            _content = message["role"] + ": " + message["content"]
-            if message["role"] == role:
-                chat_input.append({"role": Role.ASSISTANT.value, "content": _content})
-            else:
-                chat_input.append({"role": Role.USER.value, "content": _content})
-
-        chat_response = self.stateless_chat(chat_history=chat_input, **kwargs)
-        model_response = chat_response.get(
-            "response", "Error generating response"
-        ).strip()
-
-        # Removing Role Tokens from the response
-        for roles in available_roles:
-            model_response = (
-                model_response.replace(roles + ":", "", 1)
-                if model_response.startswith(roles + ":")
-                else model_response
-            )
-        # Append the model response to the chat history
-        _messages = messages.copy()
-        _messages.append({"role": role, "content": model_response})
-
-        return {"response": model_response, "chat_history": _messages}
     
     def get_token_count(self, text: str) -> int:
         """Approximates token count by splitting text on spaces."""
@@ -391,8 +287,8 @@ class GeminiApi(BaseLLM):
 
     def transform_history_for_gemini(self, history, user_prompt: str = None):
         """Transform the conversation history into the format expected by Google Gemini API."""
-        print("Transforming history for Gemini")
-        print("History: ", history)
+        #print("Transforming history for Gemini")
+        #print("History: ", history)
         transformed_history = []
         _system_instruction = None
         for message in history:

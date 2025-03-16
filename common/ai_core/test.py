@@ -84,23 +84,23 @@ tools_schema = """[
 
 documents = [
     {
-        "reference": "Doc1",
+        "id": "Doc1",
         "content": "Quantum computing leverages quantum mechanics to perform computations at speeds unattainable by classical computers. It relies on principles like superposition, where quantum bits (qubits) exist in multiple states simultaneously, and entanglement, which enables qubits to be linked regardless of distance. These properties allow quantum computers to solve complex problems efficiently. Current research is focused on improving qubit stability and error correction.",
     },
     {
-        "reference": "Doc2",
+        "id": "Doc2",
         "content": "The theory of relativity, proposed by Albert Einstein, revolutionized our understanding of space and time. It consists of special relativity, which deals with objects moving at high velocities, and general relativity, which explains gravity as the curvature of spacetime. This theory has been experimentally confirmed through observations like gravitational lensing and time dilation. Modern GPS systems rely on relativity corrections for accurate positioning.",
     },
     {
-        "reference": "Doc3",
+        "id": "Doc3",
         "content": "Machine learning is a subset of artificial intelligence that enables computers to learn from data without explicit programming. It includes supervised, unsupervised, and reinforcement learning techniques. These models are used in applications like image recognition, fraud detection, and recommendation systems. The effectiveness of a machine learning model depends on the quality and quantity of training data.",
     },
     {
-        "reference": "Doc4",
+        "id": "Doc4",
         "content": "Blockchain technology provides a decentralized and secure way to record transactions. It uses cryptographic hashing and distributed consensus to ensure data integrity. Originally developed for Bitcoin, blockchain is now used in supply chain management, digital identity, and smart contracts. The technology faces challenges like scalability and energy consumption.",
     },
     {
-        "reference": "Doc5",
+        "id": "Doc5",
         "content": "The human brain consists of billions of neurons that communicate through electrical and chemical signals. Neural networks in artificial intelligence are inspired by this biological structure. The brain's plasticity allows it to adapt and learn new information throughout life. Research in neuroscience is uncovering new treatments for cognitive disorders.",
     },
 ]
@@ -156,17 +156,17 @@ messages = [
 
     {"role": "manager", "name": "Manager", "content": "That makes sense. Can we use a message queue like Kafka or Redis Streams to notify services when a DB update happens?"},
 
-    {"role": "sandeep", "name": "Sandeep", "content": "I’d lean towards Redis Pub/Sub since we’re already using Redis. It’s lightweight compared to Kafka and works well for small-scale cache invalidation."},
+    {"role": "sandeep", "name": "Sandeep", "content": "I'd lean towards Redis Pub/Sub since we're already using Redis. It's lightweight compared to Kafka and works well for small-scale cache invalidation."},
 
     {"role": "venkat", "name": "Venkat", "content": "Nice! So, the final approach: \n1. Cache API responses in Redis with a TTL. \n2. Use event-driven invalidation via Redis Pub/Sub when a DB update occurs. \n3. Maintain a fallback mechanism in case the cache is empty."},
 
-    {"role": "manager", "name": "Manager", "content": "Great work, team! Let’s draft a detailed plan and start implementation in a small feature to test its effectiveness."},
+    {"role": "manager", "name": "Manager", "content": "Great work, team! Let's draft a detailed plan and start implementation in a small feature to test its effectiveness."},
 
-    {"role": "sandeep", "name": "Sandeep", "content": "Let’s do it. I’ll set up a PoC with Redis Pub/Sub and check how efficiently we can propagate invalidation messages."},
+    {"role": "sandeep", "name": "Sandeep", "content": "Let's do it. I'll set up a PoC with Redis Pub/Sub and check how efficiently we can propagate invalidation messages."},
 
-    {"role": "venkat", "name": "Venkat", "content": "And I’ll work on integrating TTL-based caching for API responses. Once both are done, we can test how they work together."},
+    {"role": "venkat", "name": "Venkat", "content": "And I'll work on integrating TTL-based caching for API responses. Once both are done, we can test how they work together."},
 
-    {"role": "manager", "name": "Manager", "content": "Awesome! Keep me posted on the progress. Let’s catch up in a couple of days to review the PoC results."}
+    {"role": "manager", "name": "Manager", "content": "Awesome! Keep me posted on the progress. Let's catch up in a couple of days to review the PoC results."}
 ]
 
 new_react_prompt = """You're a Data scientist. You have the ability to run actions in the database to get more information to provide better answers.
