@@ -126,7 +126,7 @@ class GeminiApi(BaseLLM):
         try:
             self.logger.debug("Tokenizing prompt: %s", prompt)
             _start_time = time.time()
-            print(f"Generating response for prompt: \n\n {prompt} \n\n")
+            #print(f"Generating response for prompt: \n\n {prompt} \n\n")
             response = self.gen_ai_client.models.generate_content(
                 model=self.model,
                 contents=prompt,

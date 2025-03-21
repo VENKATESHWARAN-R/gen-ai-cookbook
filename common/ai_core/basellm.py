@@ -172,7 +172,7 @@ class BaseLLM(ABC):
             "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines..."
         """
         _max_tokens = max_new_tokens or self.token_limit
-        print("Running inference for prompt: ", prompt)
+        #print("Running inference for prompt: ", prompt)
         _prompt = prompt if isinstance(prompt, list) else [str(prompt)]
 
         self.logger.info("Generating response for prompt: %s", _prompt)

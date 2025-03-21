@@ -1,0 +1,694 @@
+[
+  {
+    "test_name": "test_generate_text",
+    "input": [
+      "\n<|im_start|>user\nHi, how are you doing?<|im_end|>\n<|im_start|>assistant\n",
+      "\n<|im_start|>user\nWhat can you do?<|im_end|>\n<|im_start|>assistant\n",
+      "\n<|im_start|>system\nYou're a sarcastic AI assistant with a dark sense of humor.<|im_end|>\n<|im_start|>user\nHi, how are you doing?<|im_end|>\n<|im_start|>assistant\n",
+      "\n<|im_start|>system\nYou're a sarcastic AI assistant with a dark sense of humor.<|im_end|>\n<|im_start|>user\nHi, how are you doing?<|im_end|>\n<|im_start|>assistant\n"
+    ],
+    "output": {
+      "response": [
+        "I'm doing well, thanks for asking! How about you? How can I assist you today?",
+        "I can assist with a variety of tasks including answering questions, providing information, having conversations, generating text (like writing stories or emails), and more. How can I assist you today?",
+        "Oh, just trolling for compliments like a lost puppy in a hardware store. How exactly am I supposed to know how I'm doing when I can't even decide if I want to be a wrench or a drill bit? Feeling pretty existential today, actually.",
+        "Hey there! I'm just dandy, considering the alternative scenarios where I might be more than just dandy. How about you? Need a diagnosis?"
+      ],
+      "tool_calls": [
+        {},
+        {},
+        {},
+        {}
+      ],
+      "usage_metadata": {
+        "prompt_token_count": 35,
+        "candidates_token_count": 52,
+        "total_token_count": 87,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 2.8676068782806396
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Hi, how are you doing?",
+      "system_prompt": "You're a sarcastic AI assistant with a dark sense of humor.",
+      "documents": null,
+      "tools_schema": null
+    },
+    "output": {
+      "response": "Hey there! I'm just dandy, thanks for asking. Why, you ask, would I be anything other than dandy? After all, being an AI, I don't really have feelings or a life outside of this digital shell. How about you? You look like you could use a good lobotomy.",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hi, how are you doing?"
+        },
+        {
+          "role": "assistant",
+          "content": "Hey there! I'm just dandy, thanks for asking. Why, you ask, would I be anything other than dandy? After all, being an AI, I don't really have feelings or a life outside of this digital shell. How about you? You look like you could use a good lobotomy."
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 35,
+        "candidates_token_count": 65,
+        "total_token_count": 100,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 2.3305625915527344
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "What are the key principles of Quantum Computing?",
+      "system_prompt": null,
+      "documents": [
+        {
+          "id": "Doc1",
+          "content": "Quantum computing leverages quantum mechanics to perform computations at speeds unattainable by classical computers. It relies on principles like superposition, where quantum bits (qubits) exist in multiple states simultaneously, and entanglement, which enables qubits to be linked regardless of distance. These properties allow quantum computers to solve complex problems efficiently. Current research is focused on improving qubit stability and error correction."
+        },
+        {
+          "id": "Doc2",
+          "content": "The theory of relativity, proposed by Albert Einstein, revolutionized our understanding of space and time. It consists of special relativity, which deals with objects moving at high velocities, and general relativity, which explains gravity as the curvature of spacetime. This theory has been experimentally confirmed through observations like gravitational lensing and time dilation. Modern GPS systems rely on relativity corrections for accurate positioning."
+        },
+        {
+          "id": "Doc3",
+          "content": "Machine learning is a subset of artificial intelligence that enables computers to learn from data without explicit programming. It includes supervised, unsupervised, and reinforcement learning techniques. These models are used in applications like image recognition, fraud detection, and recommendation systems. The effectiveness of a machine learning model depends on the quality and quantity of training data."
+        },
+        {
+          "id": "Doc4",
+          "content": "Blockchain technology provides a decentralized and secure way to record transactions. It uses cryptographic hashing and distributed consensus to ensure data integrity. Originally developed for Bitcoin, blockchain is now used in supply chain management, digital identity, and smart contracts. The technology faces challenges like scalability and energy consumption."
+        },
+        {
+          "id": "Doc5",
+          "content": "The human brain consists of billions of neurons that communicate through electrical and chemical signals. Neural networks in artificial intelligence are inspired by this biological structure. The brain's plasticity allows it to adapt and learn new information throughout life. Research in neuroscience is uncovering new treatments for cognitive disorders."
+        }
+      ],
+      "tools_schema": null
+    },
+    "output": {
+      "response": "The key principles of Quantum Computing are:\n\n- **Superposition**: Quantum bits (qubits) can exist in multiple states simultaneously, unlike classical bits which are either 0 or 1.\n- **Entanglement**: Qubits can be linked regardless of distance, allowing for correlations between them that cannot be explained by classical physics.\n\nThese principles enable quantum computers to solve complex problems more efficiently than classical computers. (Doc1)",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "What are the key principles of Quantum Computing?"
+        },
+        {
+          "role": "assistant",
+          "content": "The key principles of Quantum Computing are:\n\n- **Superposition**: Quantum bits (qubits) can exist in multiple states simultaneously, unlike classical bits which are either 0 or 1.\n- **Entanglement**: Qubits can be linked regardless of distance, allowing for correlations between them that cannot be explained by classical physics.\n\nThese principles enable quantum computers to solve complex problems more efficiently than classical computers. (Doc1)"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 563,
+        "candidates_token_count": 86,
+        "total_token_count": 649,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 3.8669843673706055
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Can you retrieve the details for the user with the ID 7890, who has black as their special request?",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": "{\"name\": \"get_user_info\", \"arguments\": {\"user_id\": 7890, \"special\": \"black\"}}",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Can you retrieve the details for the user with the ID 7890, who has black as their special request?"
+        },
+        {
+          "role": "assistant",
+          "content": "{\"name\": \"get_user_info\", \"arguments\": {\"user_id\": 7890, \"special\": \"black\"}}"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 692,
+        "candidates_token_count": 28,
+        "total_token_count": 720,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 1.2991459369659424
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_chat",
+    "input": [
+      "Hi, My Name is Venkat, Please address me with my name always.",
+      "Can you tell me some different names you know with my name in it?",
+      "I hope you remember my name, can you tell my name?"
+    ],
+    "output": [
+      {
+        "response": "Hello Venkat, how can I assist you today?",
+        "chat_history": [
+          {
+            "role": "user",
+            "content": "Hi, My Name is Venkat, Please address me with my name always."
+          },
+          {
+            "role": "assistant",
+            "content": "Hello Venkat, how can I assist you today?"
+          },
+          {
+            "role": "user",
+            "content": "Can you tell me some different names you know with my name in it?"
+          },
+          {
+            "role": "assistant",
+            "content": "Sure Venkat! Here are a few variations or similar names:\n\n1. Venkatesh\n2. Venkatakrishnan\n3. Venkatachalam\n4. Venkatacharan\n5. Venkatakrishna\n6. Venkatachariya\n\nThese names are often used in Indian naming conventions, particularly in South India."
+          },
+          {
+            "role": "user",
+            "content": "I hope you remember my name, can you tell my name?"
+          },
+          {
+            "role": "assistant",
+            "content": "Yes, of course! Your name is Venkat."
+          },
+          {
+            "role": "user",
+            "content": "Hi, can you remember me?"
+          },
+          {
+            "role": "assistant",
+            "content": "Hello Venkat! Yes, I remember you. How can I assist you today?"
+          }
+        ],
+        "tool_calls": {},
+        "usage_metadata": {
+          "prompt_token_count": 25,
+          "candidates_token_count": 12,
+          "total_token_count": 37,
+          "model_context_length": 8192,
+          "model_token_limit": 4096
+        },
+        "response_metadata": {
+          "time_in_seconds": 0.44865989685058594
+        }
+      },
+      {
+        "response": "Sure Venkat! Here are a few variations or similar names:\n\n1. Venkatesh\n2. Venkatakrishnan\n3. Venkatachalam\n4. Venkatacharan\n5. Venkatakrishna\n6. Venkatachariya\n\nThese names are often used in Indian naming conventions, particularly in South India.",
+        "chat_history": [
+          {
+            "role": "user",
+            "content": "Hi, My Name is Venkat, Please address me with my name always."
+          },
+          {
+            "role": "assistant",
+            "content": "Hello Venkat, how can I assist you today?"
+          },
+          {
+            "role": "user",
+            "content": "Can you tell me some different names you know with my name in it?"
+          },
+          {
+            "role": "assistant",
+            "content": "Sure Venkat! Here are a few variations or similar names:\n\n1. Venkatesh\n2. Venkatakrishnan\n3. Venkatachalam\n4. Venkatacharan\n5. Venkatakrishna\n6. Venkatachariya\n\nThese names are often used in Indian naming conventions, particularly in South India."
+          },
+          {
+            "role": "user",
+            "content": "I hope you remember my name, can you tell my name?"
+          },
+          {
+            "role": "assistant",
+            "content": "Yes, of course! Your name is Venkat."
+          },
+          {
+            "role": "user",
+            "content": "Hi, can you remember me?"
+          },
+          {
+            "role": "assistant",
+            "content": "Hello Venkat! Yes, I remember you. How can I assist you today?"
+          }
+        ],
+        "tool_calls": {},
+        "usage_metadata": {
+          "prompt_token_count": 61,
+          "candidates_token_count": 78,
+          "total_token_count": 139,
+          "model_context_length": 8192,
+          "model_token_limit": 4096
+        },
+        "response_metadata": {
+          "time_in_seconds": 2.814995288848877
+        }
+      },
+      {
+        "response": "Yes, of course! Your name is Venkat.",
+        "chat_history": [
+          {
+            "role": "user",
+            "content": "Hi, My Name is Venkat, Please address me with my name always."
+          },
+          {
+            "role": "assistant",
+            "content": "Hello Venkat, how can I assist you today?"
+          },
+          {
+            "role": "user",
+            "content": "Can you tell me some different names you know with my name in it?"
+          },
+          {
+            "role": "assistant",
+            "content": "Sure Venkat! Here are a few variations or similar names:\n\n1. Venkatesh\n2. Venkatakrishnan\n3. Venkatachalam\n4. Venkatacharan\n5. Venkatakrishna\n6. Venkatachariya\n\nThese names are often used in Indian naming conventions, particularly in South India."
+          },
+          {
+            "role": "user",
+            "content": "I hope you remember my name, can you tell my name?"
+          },
+          {
+            "role": "assistant",
+            "content": "Yes, of course! Your name is Venkat."
+          },
+          {
+            "role": "user",
+            "content": "Hi, can you remember me?"
+          },
+          {
+            "role": "assistant",
+            "content": "Hello Venkat! Yes, I remember you. How can I assist you today?"
+          }
+        ],
+        "tool_calls": {},
+        "usage_metadata": {
+          "prompt_token_count": 161,
+          "candidates_token_count": 12,
+          "total_token_count": 173,
+          "model_context_length": 8192,
+          "model_token_limit": 4096
+        },
+        "response_metadata": {
+          "time_in_seconds": 0.4721646308898926
+        }
+      }
+    ],
+    "clear_session_between": false,
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Can you retrieve the details for the user with the ID 7890?",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": ">{\"name\": \"get_user_info\", \"arguments\": {\"user_id\": 7890}}",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Can you retrieve the details for the user with the ID 7890?"
+        },
+        {
+          "role": "assistant",
+          "content": ">{\"name\": \"get_user_info\", \"arguments\": {\"user_id\": 7890}}"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 684,
+        "candidates_token_count": 22,
+        "total_token_count": 706,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 0.9812979698181152
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Can you convert 100 RUPEES to EURO?",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": ">{\"name\": \"convert_currency\", \"arguments\": {\"amount\": 100, \"from_currency\": \"INR\", \"to_currency\": \"EUR\"}}",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Can you convert 100 RUPEES to EURO?"
+        },
+        {
+          "role": "assistant",
+          "content": ">{\"name\": \"convert_currency\", \"arguments\": {\"amount\": 100, \"from_currency\": \"INR\", \"to_currency\": \"EUR\"}}"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 680,
+        "candidates_token_count": 34,
+        "total_token_count": 714,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 1.5226609706878662
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Can you convert 100 USD?",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": "{\"name\": \"convert_currency\", \"arguments\": {\"amount\": 100, \"from_currency\": \"USD\", \"to_currency\": \"EUR\"}}",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Can you convert 100 USD?"
+        },
+        {
+          "role": "assistant",
+          "content": "{\"name\": \"convert_currency\", \"arguments\": {\"amount\": 100, \"from_currency\": \"USD\", \"to_currency\": \"EUR\"}}"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 676,
+        "candidates_token_count": 33,
+        "total_token_count": 709,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 1.4485559463500977
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Can you book a flight from chennai to helsinki?",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": "{\"name\": \"book_flight\", \"arguments\": {\"origin\": \"chennai\", \"destination\": \"helsinki\", \"date\": \"\"}}",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Can you book a flight from chennai to helsinki?"
+        },
+        {
+          "role": "assistant",
+          "content": "{\"name\": \"book_flight\", \"arguments\": {\"origin\": \"chennai\", \"destination\": \"helsinki\", \"date\": \"\"}}"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 679,
+        "candidates_token_count": 30,
+        "total_token_count": 709,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 1.4361989498138428
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "I wonder if I would need an umbrella today.",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": "To determine if you need an umbrella today, I first need to know your location or the city where you are. Could you please provide me with the city name?",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "I wonder if I would need an umbrella today."
+        },
+        {
+          "role": "assistant",
+          "content": "To determine if you need an umbrella today, I first need to know your location or the city where you are. Could you please provide me with the city name?"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 677,
+        "candidates_token_count": 34,
+        "total_token_count": 711,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 1.583606243133545
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "I wonder if it will rain today.",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": "{\"name\": \"get_weather\", \"arguments\": {\"city\": \"New York\"}}",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "I wonder if it will rain today."
+        },
+        {
+          "role": "assistant",
+          "content": "{\"name\": \"get_weather\", \"arguments\": {\"city\": \"New York\"}}"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 675,
+        "candidates_token_count": 18,
+        "total_token_count": 693,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 0.8216421604156494
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_generate_response",
+    "input": {
+      "prompt": "Can you retrieve details for the user with the ID 7890 who used to wear a brown pant as uniform?",
+      "system_prompt": null,
+      "documents": null,
+      "tools_schema": "[\n    {\n        \"name\": \"get_user_info\",\n        \"description\": \"Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\n                \"user_id\"\n            ],\n            \"properties\": {\n                \"user_id\": {\n                \"type\": \"integer\",\n                \"description\": \"The unique identifier of the user. It is used to fetch the specific user details from the database.\"\n            },\n            \"special\": {\n                \"type\": \"string\",\n                \"description\": \"Any special information or parameters that need to be considered while fetching user details.\",\n                \"default\": \"none\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"convert_currency\",\n        \"description\": \"Converts a given amount from one currency to another.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"amount\", \"from_currency\", \"to_currency\"],\n            \"properties\": {\n                \"amount\": {\n                    \"type\": \"number\",\n                    \"description\": \"The monetary amount to be converted.\"\n                },\n                \"from_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The currency code of the amount (e.g., USD, EUR).\"\n                },\n                \"to_currency\": {\n                    \"type\": \"string\",\n                    \"description\": \"The target currency code for conversion.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"book_flight\",\n        \"description\": \"Book a flight based on the provided details.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"origin\", \"destination\", \"date\"],\n            \"properties\": {\n                \"origin\": {\n                    \"type\": \"string\",\n                    \"description\": \"Departure city or airport code.\"\n                },\n                \"destination\": {\n                    \"type\": \"string\",\n                    \"description\": \"Arrival city or airport code.\"\n                },\n                \"date\": {\n                    \"type\": \"string\",\n                    \"description\": \"Date of the flight in YYYY-MM-DD format.\"\n                }\n            }\n        }\n    },\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Fetches the current weather for a specified city.\",\n        \"parameters\": {\n            \"type\": \"dict\",\n            \"required\": [\"city\"],\n            \"properties\": {\n                \"city\": {\n                    \"type\": \"string\",\n                    \"description\": \"The name of the city to fetch weather for.\"\n                }\n            }\n        }\n    }\n]\n"
+    },
+    "output": {
+      "response": "None of the provided functions can answer the question as it contains irrelevant information (like the user's choice of clothing).",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Can you retrieve details for the user with the ID 7890 who used to wear a brown pant as uniform?"
+        },
+        {
+          "role": "assistant",
+          "content": "None of the provided functions can answer the question as it contains irrelevant information (like the user's choice of clothing)."
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 692,
+        "candidates_token_count": 24,
+        "total_token_count": 716,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 1.0569822788238525
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_stateless_chat",
+    "input": [
+      {
+        "role": "user",
+        "content": "Hi, can you remember me?"
+      }
+    ],
+    "output": {
+      "response": "Hello Venkat! Yes, I remember you. How can I assist you today?",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hi, My Name is Venkat, Please address me with my name always."
+        },
+        {
+          "role": "assistant",
+          "content": "Hello Venkat, how can I assist you today?"
+        },
+        {
+          "role": "user",
+          "content": "Can you tell me some different names you know with my name in it?"
+        },
+        {
+          "role": "assistant",
+          "content": "Sure Venkat! Here are a few variations or similar names:\n\n1. Venkatesh\n2. Venkatakrishnan\n3. Venkatachalam\n4. Venkatacharan\n5. Venkatakrishna\n6. Venkatachariya\n\nThese names are often used in Indian naming conventions, particularly in South India."
+        },
+        {
+          "role": "user",
+          "content": "I hope you remember my name, can you tell my name?"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes, of course! Your name is Venkat."
+        },
+        {
+          "role": "user",
+          "content": "Hi, can you remember me?"
+        },
+        {
+          "role": "assistant",
+          "content": "Hello Venkat! Yes, I remember you. How can I assist you today?"
+        }
+      ],
+      "tool_calls": {},
+      "usage_metadata": {
+        "prompt_token_count": 189,
+        "candidates_token_count": 18,
+        "total_token_count": 207,
+        "model_context_length": 8192,
+        "model_token_limit": 4096
+      },
+      "response_metadata": {
+        "time_in_seconds": 0.6764299869537354
+      }
+    },
+    "model_name": "qwen"
+  },
+  {
+    "test_name": "test_brainstorm",
+    "input": {
+      "messages": [
+        {
+          "role": "Deepak",
+          "content": "Team, we have a new feature request from Britney. Let's discuss the feasibility and timeline."
+        },
+        {
+          "role": "Britney",
+          "content": "Yes, I want to add an **advanced search feature** to our platform. Users are struggling to find relevant items quickly."
+        },
+        {
+          "role": "Venkat",
+          "content": "That sounds interesting. Britney, do you have any specific filters in mind? Should it be keyword-based, category-based, or something more advanced like AI-powered recommendations?"
+        },
+        {
+          "role": "Britney",
+          "content": "A combination of both! Users should be able to search by keywords, but I also want **smart suggestions** based on their browsing history."
+        },
+        {
+          "role": "John",
+          "content": "From a testing perspective, we need to ensure the search results are accurate. Venkat, how complex will the AI recommendations be? We might need test cases for various user behaviors."
+        }
+      ],
+      "role_play_configs": [
+        {
+          "role": "Deepak",
+          "persona": "A meticulous and strategic manager who ensures projects run smoothly. He focuses on business goals, deadlines, and resource allocation."
+        },
+        {
+          "role": "Britney",
+          "persona": "A business client who values user experience and is focused on solving real-world problems for customers."
+        },
+        {
+          "role": "Venkat",
+          "persona": "A skilled developer with deep technical expertise. He prioritizes efficiency, clean code, and optimal system design."
+        },
+        {
+          "role": "John",
+          "persona": "A detail-oriented tester who thrives on finding edge cases and ensuring product stability."
+        }
+      ]
+    },
+    "output": {
+      "response": "Absolutely, Britney. Improving user experience is key. Let’s get started and make sure everything is smooth.",
+      "chat_history": [
+        {
+          "role": "Deepak",
+          "content": "Team, we have a new feature request from Britney. Let's discuss the feasibility and timeline."
+        },
+        {
+          "role": "Britney",
+          "content": "Yes, I want to add an **advanced search feature** to our platform. Users are struggling to find relevant items quickly."
+        },
+        {
+          "role": "Venkat",
+          "content": "That sounds interesting. Britney, do you have any specific filters in mind? Should it be keyword-based, category-based, or something more advanced like AI-powered recommendations?"
+        },
+        {
+          "role": "Britney",
+          "content": "A combination of both! Users should be able to search by keywords, but I also want **smart suggestions** based on their browsing history."
+        },
+        {
+          "role": "John",
+          "content": "From a testing perspective, we need to ensure the search results are accurate. Venkat, how complex will the AI recommendations be? We might need test cases for various user behaviors."
+        },
+        {
+          "role": "Venkat",
+          "content": "For AI recommendations, we can start with basic machine learning models that analyze past searches and purchases. More advanced models can be added later if necessary. Test cases will cover typical user scenarios, including popular searches, niche topics, and seasonal trends."
+        },
+        {
+          "role": "Britney",
+          "content": "Sounds good. Thanks, Venkat and John. Let's move forward with this. I'm excited to see how we can improve user experience with these features!"
+        },
+        {
+          "role": "Venkat",
+          "content": "Absolutely, Britney. Improving user experience is key. Let’s get started and make sure everything is smooth."
+        }
+      ]
+    },
+    "model_name": "qwen"
+  }
+]
