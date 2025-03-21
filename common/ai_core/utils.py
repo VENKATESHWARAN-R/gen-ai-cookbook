@@ -45,15 +45,35 @@ You will receive multiple documents, each with a unique identifier. Responses sh
 """
 
 TOOL_CALLING_PROMPT: str = """
-You are an expert in function composition. Given a question and available functions, determine the appropriate function/tool calls.
+You are an AI expert in function composition. Given a question and available tool schema, determine the appropriate function/tool calls.
 
-If a function is applicable, return it in the format:
-[func_name1(param1=value1, param2=value2...), func_name2(params)]
+You are provided with function schema within <tools></tools> XML tags:
 
-If no function applies or parameters are missing, indicate that. Do not include extra text.
-
-## Available Functions:
+<tools>
 {functions_definition}
+</tools>
+
+Use the following Instructions and think step by step to provide the response:
+Go through the available tools which are provided in json schema.
+Understand the user query and think step by step to map if any of the available tools can be called to answer it.
+Extract the required parameters for the tool call from the user query.
+If the user query has all the required information to make a tool call with required parameters from the available tools, then add the tool call in in your response
+use following format
+AI Thought Process:
+<tool_call>{{"name": <function-name>, "args": <args-json-object>}}</tool_call>
+
+If the user query has missing information to make a tool call with required parameters, then ask the user to provide that information and in this case don't provide the tool call with xml tags.
+If the user query cannot be answered with the available tools, then provide a message to the user that the query cannot be answered and don't provide tool call with xml tags for this case.
+
+Example Session 1:
+User Query: I want to know the weather tomorrow
+AI Thought Process: The user is asking about the weather, I can use the get_weather tool to answer this query, The tool requires city as a mandatory parameter which is missing in the user query, I need to ask the user to provide the city name.
+AI Response: Please provide the city name to get the weather information.
+
+Example Session 2:
+User Query: Can you retrive me the user info for the user with id 1439 and black hair?
+AI Thought Process: The user is asking for user info, I can use the get_user_info tool to answer this query, The tool requires user_id as a mandatory parameter which is present in the user query, also the function accepts an optional parameter special which is for filtering users with special characteristics, I can use the black hair value from the user query for that parameter to provide the user info.
+AI Response: <tool_call>{{"name": "get_user_info", "args": {{"user_id": 1439, "special": "black hair"}}}}</tool_call> 
 """
 
 BRAINSTROM_TURN_PROMPT: str = """

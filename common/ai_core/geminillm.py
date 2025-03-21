@@ -134,16 +134,25 @@ class GeminiApi(BaseLLM):
             )
             generated_text = response.text
             _end_time = time.time()
-            self.logger.debug("Time taken: %.2f seconds", _end_time - _start_time)
+            _inference_time = _end_time - _start_time
+            self.logger.debug("Time taken: %.2f seconds", _inference_time)
 
         except Exception as e:
             self.logger.error("Error generating response: %s", e)
             return f"Error generating response: {str(e)}"
 
         self.logger.debug("Generated response: %s", generated_text)
-        print("Generated response: ", generated_text)
+        #print("Generated response: ", generated_text)
 
-        return generated_text
+        usage_metadata = response.usage_metadata.to_json_dict()
+        tool_calls = self._check_tool_calls(generated_text)
+
+        return {
+            "response": generated_text,
+            "tool_calls": tool_calls,
+            "usage_metadata": usage_metadata,
+            "response_metadata": {"time_in_seconds": _inference_time},
+        }
 
     def generate_response(
         self,
@@ -199,12 +208,14 @@ class GeminiApi(BaseLLM):
             chat_history=chat_history,
         )
 
-        model_response = self.generate_text(
+        _model_response = self.generate_text(
             input_prompt,
             max_new_tokens=max_new_tokens,
             skip_special_tokens=skip_special_tokens,
             **kwargs,
         )
+        model_response = _model_response.get("response", "Error generating response")
+        _model_response.pop("response", None)
 
         for token in self.special_tokens:
             model_response = model_response.replace(token, "")
@@ -213,7 +224,11 @@ class GeminiApi(BaseLLM):
         _chat_history.append({"role": Role.USER.value, "content": prompt})
         _chat_history.append({"role": Role.ASSISTANT.value, "content": model_response})
 
-        return {"response": model_response, "chat_history": _chat_history}
+        return {
+            "response": model_response,
+            "chat_history": _chat_history,
+            **_model_response,
+        }
 
     def chat(
         self,
@@ -245,8 +260,6 @@ class GeminiApi(BaseLLM):
         if clear_session:
             self.clear_history()
 
-        return_dict: Dict[str, Any] = {}
-
         # Initialize chat history if not provided
         if chat_history is None:
             chat_history = []
@@ -265,30 +278,30 @@ class GeminiApi(BaseLLM):
         generated_response = self.generate_text(
             transformed_history, system_instruction=system_instruction, **kwargs
         )
-        return_dict["response"] = generated_response
+        _generated_response = generated_response.get("response", "Error generating response")
         # If no chat history is passed, add the user input and model response to the history
         if not _history_checker and not stateless:
-            self.add_to_history(prompt, generated_response)
-            return_dict["chat_history"] = self.history
+            self.add_to_history(prompt, _generated_response)
+            generated_response["chat_history"] = self.history
         else:  # if chat history is passed, return the chat history as is
-            return_dict["chat_history"] = chat_history
-            return_dict["chat_history"].extend(
+            generated_response["chat_history"] = chat_history
+            generated_response["chat_history"].extend(
                 [
                     {"role": Role.USER.value, "content": prompt},
-                    {"role": Role.ASSISTANT.value, "content": generated_response},
+                    {"role": Role.ASSISTANT.value, "content": _generated_response},
                 ]
             )
 
-        return return_dict
-    
+        return generated_response
+
     def get_token_count(self, text: str) -> int:
         """Approximates token count by splitting text on spaces."""
         return len(text.split()) if text else 0
 
     def transform_history_for_gemini(self, history, user_prompt: str = None):
         """Transform the conversation history into the format expected by Google Gemini API."""
-        #print("Transforming history for Gemini")
-        #print("History: ", history)
+        # print("Transforming history for Gemini")
+        # print("History: ", history)
         transformed_history = []
         _system_instruction = None
         for message in history:

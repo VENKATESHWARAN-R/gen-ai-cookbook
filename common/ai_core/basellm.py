@@ -7,10 +7,8 @@ First Version: 2025-Mar-12
 """
 
 from abc import ABC
-from dataclasses import dataclass
-from enum import Enum
+import json
 import logging
-from pydantic import BaseModel, Field
 import re
 from typing import List, Dict, Any, Union, Optional, Callable
 import time
@@ -155,7 +153,7 @@ class BaseLLM(ABC):
         max_new_tokens: int = None,
         skip_special_tokens: bool = True,
         **kwargs,
-    ) -> Union[List[str], str]:
+    ) -> Union[List[Dict], Dict]:
         """
         Generates text completion from the given prompt(s).
 
@@ -166,11 +164,11 @@ class BaseLLM(ABC):
             **kwargs: Additional generation parameters passed to the underlying model.
 
         Returns:
-            Union[List[str], str]: Generated text(s), returned as a single string if input was a string, or a list if input was a list.
+            Union[List[Dict], Dict]: Generated text completion(s) as a list of dictionaries or a single dictionary with some extra meta data.
 
         Example:
             >>> result = llm.generate_text("What is AI?")
-            >>> print(result)
+            >>> print(result.get('response'))
             "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines..."
         """
         _max_tokens = max_new_tokens or self.token_limit
@@ -194,7 +192,9 @@ class BaseLLM(ABC):
                     **kwargs,
                 )
                 _end_time = time.time()
-                self.logger.debug("Time taken: %.2f seconds", _end_time - _start_time)
+                # Calculating inference time in seconds
+                _inference_time = _end_time - _start_time
+                self.logger.debug("Time taken: %.2f seconds", _inference_time)
 
         except Exception as e:
             self.logger.error("Error generating response: %s", e)
@@ -210,11 +210,35 @@ class BaseLLM(ABC):
             generated_ids, skip_special_tokens=skip_special_tokens
         )
         self.logger.debug("Generated response: %s", decoded_outputs)
-        print("Generated response: ", decoded_outputs)
+        # print("Generated response: ", decoded_outputs)
 
-        return (
-            decoded_outputs[0].strip() if len(decoded_outputs) == 1 else decoded_outputs
-        )
+        usage_metadata = {
+            "prompt_token_count": len(model_inputs.get("input_ids")[0]),
+            "candidates_token_count": len(generated_ids[0]),
+            "total_token_count": len(model_inputs.get("input_ids")[0])
+            + len(generated_ids[0]),
+            "model_context_length": self.context_length,
+            "model_token_limit": self.token_limit,
+        }
+        tool_calls = [self._check_tool_calls(_) for _ in decoded_outputs]
+
+        response_metadata = {"time_in_seconds": _inference_time}
+        model_metadata = {
+            "usage_metadata": usage_metadata,
+            "response_metadata": response_metadata,
+        }
+
+        if len(decoded_outputs) == 1:
+            return {
+                "response": decoded_outputs[0].strip(),
+                "tool_calls": tool_calls[0],
+                **model_metadata,
+            }
+        return {
+            "response": [output.strip() for output in decoded_outputs],
+            "tool_calls": tool_calls,
+            **model_metadata,
+        }
 
     def generate_response(
         self,
@@ -302,12 +326,15 @@ class BaseLLM(ABC):
             chat_history=chat_history,
         )
 
-        model_response = self.generate_text(
+        _model_response: Dict = self.generate_text(
             input_prompt,
             max_new_tokens=max_new_tokens,
             skip_special_tokens=skip_special_tokens,
             **kwargs,
         )
+
+        model_response = _model_response.get("response", "Error generating response")
+        _model_response.pop("response", None)
 
         for token in self.special_tokens:
             model_response = model_response.replace(token, "")
@@ -316,7 +343,11 @@ class BaseLLM(ABC):
         _chat_history.append({"role": Role.USER.value, "content": prompt})
         _chat_history.append({"role": Role.ASSISTANT.value, "content": model_response})
 
-        return {"response": model_response, "chat_history": _chat_history}
+        return {
+            "response": model_response,
+            "chat_history": _chat_history,
+            **_model_response,
+        }
 
     def chat(
         self,
@@ -529,9 +560,15 @@ class BaseLLM(ABC):
 
         def format_conversation_history(history: List[Dict[str, str]]) -> str:
             """Formats the conversation history into a string suitable for model input."""
-            role_content_list = [f">> {entry['role']}: {entry['content']}" for entry in history]
+            role_content_list = [
+                f">> {entry['role']}: {entry['content']}" for entry in history
+            ]
             role_content = "\n".join(role_content_list)
-            role_content += '\n\n---\nThe Last speaker is '+history[-1]["role"] if role_content_list else ""
+            role_content += (
+                "\n\n---\nThe Last speaker is " + history[-1]["role"]
+                if role_content_list
+                else ""
+            )
             return role_content
 
         def format_prompt_for_next_role(
@@ -617,6 +654,70 @@ class BaseLLM(ABC):
             role = ""  # Reset role for AI to decide next if looping
 
         return {"response": model_response, "chat_history": chat_history}
+
+    def _get_model_info(self) -> Dict[str, Any]:
+        """
+        Returns model information such as model name, number of parameters, and device type.
+
+        Returns:
+            Dict[str, Any]: Model information dictionary.
+
+        Example:
+            >>> model_info = base_llm._get_model_info()
+            >>> print(model_info)
+            {"model_name": "Gemma3ForCausalLM", "num_parameters": 3880263168, "device": "cuda"}
+        """
+        return {
+            "model_name": self.model._get_name(),
+            "num_parameters": self.model.num_parameters(),
+            "device": self.device.type,
+            "model_version": self.model._version,
+            "model_datatype": self.model.dtype,
+        }
+
+    def healthcheck(self) -> Dict[str, Any]:
+        """
+        Performs a health check on the model, verifying its status and configuration.
+
+        Returns:
+            Dict[str, Any]: Health check status and model information.
+
+        Example:
+            >>> health_status = base_llm.healthcheck()
+            >>> print(health_status)
+            {"status": "healthy", "model_name": "Gemma3ForCausalLM", "num_parameters": 3880263168, "device": "cuda"}
+        """
+        try:
+            model_info = self._get_model_info()
+            return {"status": "healthy", **model_info}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_tool_calls(self, text: str) -> Dict:
+        """
+        Checks for tool calls in the given text and returns the extracted tool calls.
+
+        Args:
+            text (str): The text to check for tool calls.
+
+        Returns:
+            Dict: A dictionary containing the extracted tool calls.
+
+        Example:
+            >>> tool_calls = llm.check_tool_calls("<tool_call>{"functionCall": {"name": "get_user_info", "args": {"user_id": 7890, "special": "black"}}}</tool_call>")
+            >>> print(tool_calls)
+            {"functionCall": {"name": "get_user_info", "args": {"user_id": 7890, "special": "black"}}}
+        """
+        try:
+            # Regex to extract JSON content inside <tool_call></tool_call>
+            match = re.search(r"<tool_call>(.*?)</tool_call>", text, re.DOTALL)
+            if match:
+                tool_call_json = match.group(1).strip()
+                return json.loads(tool_call_json)
+        except json.JSONDecodeError as e:
+            print(f"Error parsing tool call JSON: {e}")
+
+        return {}
 
     def _extract_from_xml(self, response: str, tag: str) -> str:
         """
