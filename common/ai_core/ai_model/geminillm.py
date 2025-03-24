@@ -126,7 +126,7 @@ class GeminiApi(BaseLLM):
         try:
             self.logger.debug("Tokenizing prompt: %s", prompt)
             _start_time = time.time()
-            #print(f"Generating response for prompt: \n\n {prompt} \n\n")
+            # print(f"Generating response for prompt: \n\n {prompt} \n\n")
             response = self.gen_ai_client.models.generate_content(
                 model=self.model,
                 contents=prompt,
@@ -139,10 +139,12 @@ class GeminiApi(BaseLLM):
 
         except Exception as e:
             self.logger.error("Error generating response: %s", e)
-            return f"Error generating response: {str(e)}"
+            return {
+                "response": f"Error generating response: {str(e)}",
+            }
 
         self.logger.debug("Generated response: %s", generated_text)
-        #print("Generated response: ", generated_text)
+        # print("Generated response: ", generated_text)
 
         usage_metadata = response.usage_metadata.to_json_dict()
         tool_calls = self._check_tool_calls(generated_text)
@@ -278,7 +280,9 @@ class GeminiApi(BaseLLM):
         generated_response = self.generate_text(
             transformed_history, system_instruction=system_instruction, **kwargs
         )
-        _generated_response = generated_response.get("response", "Error generating response")
+        _generated_response = generated_response.get(
+            "response", "Error generating response"
+        )
         # If no chat history is passed, add the user input and model response to the history
         if not _history_checker and not stateless:
             self.add_to_history(prompt, _generated_response)
@@ -297,6 +301,29 @@ class GeminiApi(BaseLLM):
     def get_token_count(self, text: str) -> int:
         """Approximates token count by splitting text on spaces."""
         return len(text.split()) if text else 0
+
+    def healthcheck(self) -> Dict[str, Any]:
+        """
+        Performs a health check on the model, verifying its status and configuration.
+
+        Returns:
+            Dict[str, Any]: Health check status and model information.
+
+        Example:
+            >>> health_status = base_llm.healthcheck()
+            >>> print(health_status)
+            {"status": "healthy", "model_name": "Gemma3ForCausalLM", "num_parameters": 3880263168, "device": "cuda"}
+        """
+        try:
+            model_response = self.generate_text("This is ahealth check, Just respond with - I'm Healthy")
+            if (
+                model_response.get("response", "").strip()
+                == "Error generating response"
+            ):
+                raise RuntimeError("Model response error")
+            return {"status": "healthy", "response": model_response}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
 
     def transform_history_for_gemini(self, history, user_prompt: str = None):
         """Transform the conversation history into the format expected by Google Gemini API."""

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 50px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #007bff;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+        }
+        .chat-messages {
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            border-bottom: 1px solid #ddd;
+        }
+        .chat-message {
+            margin-bottom: 15px;
+        }
+        .chat-message .message {
+            padding: 10px;
+            border-radius: 5px;
+            background: #f1f1f1;
+            display: inline-block;
+        }
+        .chat-message.user .message {
+            background: #007bff;
+            color: #fff;
+        }
+        .chat-message.assistant .message {
+            background: #28a745;
+            color: #fff;
+        }
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            background: #f4f4f4;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .chat-input button {
+            padding: 10px 20px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>Chat Interface</h2>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- Messages will be appended here -->
+        </div>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let chatHistory = []; // To store the chat history
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const messageText = messageInput.value.trim();
+            if (messageText === '') return;
+
+            // Display the user message
+            appendMessage('user', messageText);
+
+            try {
+                // Send API request
+                const response = await fetch('/api/llm/stateless_chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_message: messageText,
+                        chat_history: chatHistory
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store chat history from response
+                    chatHistory = data.chat_history;
+
+                    // Display assistant response
+                    appendMessage('assistant', data.assistant_response);
+                } else {
+                    appendMessage('assistant', 'Error: ' + data.detail);
+                }
+            } catch (error) {
+                appendMessage('assistant', 'Error communicating with server.');
+            }
+
+            messageInput.value = '';
+            messageInput.focus();
+        }
+
+        function appendMessage(sender, text) {
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('chat-message', sender);
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.textContent = text;
+            messageContainer.appendChild(messageElement);
+            document.getElementById('chat-messages').appendChild(messageContainer);
+
+            // Auto-scroll to latest message
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>

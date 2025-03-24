@@ -1,5 +1,6 @@
 # run_tests.py
 
+import sys
 import os
 import time
 import argparse
@@ -9,12 +10,14 @@ from rich.progress import Progress
 from rich.table import Table
 from rich.console import Console
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 # Local imports
-from ai_core import QwenLocal, GemmaLocal, LlamaLocal, PhiLocal, GeminiApi
-from llm_tester import LLMTester
+from ai_core.ai_model import QwenLocal, GemmaLocal, LlamaLocal, PhiLocal, GeminiApi
+from ai_core.test.llm_tester import LLMTester
 
 # Test configs
-from test_configs import (
+from ai_core.test.test_configs import (
     SYSTEM_PROMPT, USER_PROMPT1, USER_PROMPT2,
     RAG_PROMPT, TOOL_PROMPT, CHAT_PROMPT1, CHAT_PROMPT2, CHAT_PROMPT3,
     TOOL_PROMPTS, documents, tools_schema,
@@ -24,7 +27,6 @@ from test_configs import (
 console = Console()
 
 # A registry mapping model “keys” to the classes (and any common/default arguments).
-# Feel free to add more models or rename them as needed.
 MODEL_REGISTRY = {
     "qwen":    QwenLocal,
     "gemma":   GemmaLocal,
@@ -185,7 +187,7 @@ def main():
         progress.update(test_task, advance=1)
 
     # 5) Save all results to JSON
-    results_filename = f"./results/{args.model}_test_results.json"
+    results_filename = f"./test_results/{args.model}_test_results.json"
     tester.save_results(results_filename)
 
     # 6) Print summary of timings

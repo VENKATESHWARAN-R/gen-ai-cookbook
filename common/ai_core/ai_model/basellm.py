@@ -6,7 +6,6 @@ This is just to streamline for custom and specific usecases.
 First Version: 2025-Mar-12
 """
 
-from abc import ABC
 import json
 import logging
 import re
@@ -29,7 +28,7 @@ from .utils import (
 
 # Creating a base class for the models,
 # since we will be experimenting with different models which have different requirements
-class BaseLLM(ABC):
+class BaseLLM:
     """
     Abstract base class for LLM models, defining common functionality.
 
@@ -138,6 +137,7 @@ class BaseLLM(ABC):
                 model, torch_dtype=torch.bfloat16, **kwargs
             )
             self.model.to(self.device)
+            self.model.eval()
         except Exception as e:
             self.logger.error("Error loading model '%s': %s", model, e)
             raise RuntimeError(f"Failed to load model '{model}'") from e
@@ -172,7 +172,7 @@ class BaseLLM(ABC):
             "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines..."
         """
         _max_tokens = max_new_tokens or self.token_limit
-        #print("Running inference for prompt: ", prompt)
+        # print("Running inference for prompt: ", prompt)
         _prompt = prompt if isinstance(prompt, list) else [str(prompt)]
 
         self.logger.info("Generating response for prompt: %s", _prompt)
@@ -494,6 +494,7 @@ class BaseLLM(ABC):
         messages: List[Dict[str, str]],
         role: str = "",
         role_play_configs: Optional[List[Union[RolePlay, Dict[str, str]]]] = None,
+        iam: str = None,
         ai_assisted_turns: int = 0,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -516,6 +517,8 @@ class BaseLLM(ABC):
             ai_assisted_turns (int):
                 Number of AI-assisted turns to generate in the conversation. Defaults to 0.
                 If Provided The model will generate the next `ai_assisted_turns` responses based on the provided messages and the model will choose who will chat next.
+            iam (str):
+                The role of the user who is interacting with the model. This is used to reply to the user when it's the user turn. this only works when uing AI assisted turns
             **kwargs:
                 Additional parameters for model inference and generation.
 
@@ -594,6 +597,9 @@ class BaseLLM(ABC):
                     f"Invalid role-play configuration: {e}. Ensure valid RolePlay instances or dictionaries."
                 )
 
+        assert role != iam, "The role for AI and iam should not be the same"
+        model_response: str = ""
+
         role_play_configs = validate_role_configs(
             role_play_configs or self.role_play_configs
         )
@@ -608,6 +614,11 @@ class BaseLLM(ABC):
                 format_prompt_for_next_role,
                 role_play_configs=role_play_configs,
             )
+
+            if current_role == iam:
+                if _ == 0:
+                    model_response = f"Your turn {iam}."
+                break
 
             system_instruction = (
                 f"You are in a group chat. Act as {current_role}.\n"
@@ -672,7 +683,6 @@ class BaseLLM(ABC):
             "num_parameters": self.model.num_parameters(),
             "device": self.device.type,
             "model_version": self.model._version,
-            "model_datatype": self.model.dtype,
         }
 
     def healthcheck(self) -> Dict[str, Any]:

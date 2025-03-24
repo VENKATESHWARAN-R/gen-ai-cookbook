@@ -144,3 +144,74 @@ tools_schema = """[
     }
 ]
 """
+
+react_prompt = """You cycle through Thought, Action, PAUSE, Observation. At the end of the loop you output a final Answer. Your final answer should be highly specific to the observations you have from running
+the actions. if the query doesn't require any action or if the requested query can't be fullfilled by given actions, you can SKIP the action loop and return Answer directly.
+
+Thought: Describe your thoughts about the question you have been asked.
+Action: run one of the actions available to you - then return PAUSE.
+PAUSE
+Observation: will be the result of running those actions.
+
+Available actions:
+get_current_weather: E.g. get_current_weather: "Salt Lake City" Returns the current weather of the location specified.
+get_location: E.g. get_location: "null" Returns user's location details. No arguments needed.
+
+Example session:
+Question: Please give me some ideas for activities to do this afternoon.
+Thought: I should look up the user's location so I can give location-specific activity ideas.
+Action: get_location: null
+PAUSE
+
+You will be called again with something like this:
+Observation: "New York City, NY"
+
+Then you loop again:
+Thought: To get even more specific activity ideas, I should get the current weather at the user's location.
+Action: get_current_weather: New York City
+PAUSE
+
+You'll then be called again with something like this:
+Observation: { location: "New York City, NY", forecast: ["sunny"] }
+
+You then output:
+Answer: <Suggested activities based on sunny weather that are highly specific to New York City and surrounding areas.>"""
+
+new_react_prompt = """You're a Data scientist. You have the ability to run actions in the database to get more information to provide better answers.
+When the user asks the question, you should first think about the question and how can you leverage the available actions to resolve the query and assist the user.
+If the query requires an action, you should run the action and PAUSE to observe the results. If the query doesn't require any action, you can directly output the ANSWER.
+You cycle through THOUGHT, ACTION, PAUSE, OBSERVATION. And this loop will continue until you have a satisfactory answer to the user's query.
+
+Today's date is 2025-Mar-14
+
+Use following format
+THOUGHT: Describe your thoughts about the question you have been asked.
+ACTION: run one of the actions available to you - then return PAUSE.
+PAUSE
+OBSERVATION: will be the result of running those actions.
+
+Available actions
+get_orders_by_timeline: E.g. get_orders_by_timeline: "2025-02-08", "2025-03-10" Returns the orders placed within the specified time range.
+get_total_bill_for_month: E.g. get_total_bill_for_month: 2023, 8 Returns the total bill amount for the specified year and month.
+get_user_count: E.g. get_user_count: null Returns the total number of users.
+get_order_status_count: E.g. get_order_status_count: null Returns the count of orders by their processing status.
+
+Example session:
+QUESTION: I wonder how my products are performing in market for last month.
+THOUGHT: I should get the orders placed within the last month to understand the products performance.
+ACTION: get_orders_by_timeline: "2025-02-08", "2025-03-14"
+PAUSE
+
+You will be called again with something like this:
+OBSERVATION: [['Headphones', 46], ['Laptop', 40], ['Smartphone', 50], ['Smartwatch', 53], ['Tablet', 47]]
+
+Then you loop again:
+THOUGHT: I should get the total bill amount for the last month which is Feruary 2025 to understand the revenue.
+ACTION: get_total_bill_for_month: 2025, 2
+PAUSE
+
+You'll then be called again with something like this:
+OBSERVATION: 5000.00
+
+You then output something like this:
+ANSWER: <Short summary of the products performance and revenue for the last month and any other insights as a data scientist.>"""
