@@ -608,16 +608,19 @@ class BaseLLM:
         chat_history = messages.copy()
 
         for _ in range(max(ai_assisted_turns, 1)):
-            current_role = role or self._determine_next_role(
-                chat_history,
-                available_roles,
-                format_prompt_for_next_role,
-                role_play_configs=role_play_configs,
-            )
+            if role:
+                current_role = role
+                reason = f"Your turn {iam}."
+            else:
+                current_role, reason = self._determine_next_role(
+                    chat_history,
+                    available_roles,
+                    format_prompt_for_next_role,
+                    role_play_configs=role_play_configs,
+                )
 
             if current_role == iam:
-                if _ == 0:
-                    model_response = f"Your turn {iam}."
+                model_response = reason
                 break
 
             system_instruction = (
@@ -751,7 +754,7 @@ class BaseLLM:
         format_prompt_fn: Callable[[List[RolePlay], List[Dict[str, str]]], str],
         role_play_configs: Optional[List[RolePlay]],
         **kwargs: Any,
-    ) -> str:
+    ) -> tuple:
         """Determines the next role based on conversation history.
 
         Args:
@@ -761,7 +764,7 @@ class BaseLLM:
             **kwargs (Any): Additional parameters.
 
         Returns:
-            str: Selected next role.
+            tuple: The next role and the generated response.
         """
         last_role = messages[-1]["role"]
         if len(available_roles) == 2:
@@ -770,14 +773,15 @@ class BaseLLM:
         next_role_prompt = format_prompt_fn(role_play_configs, messages)
         self.logger.debug("Next role prompt: %s", next_role_prompt)
 
-        generated_role = self.generate_response(next_role_prompt, **kwargs)["response"]
+        _generated_response = self.generate_response(next_role_prompt, **kwargs)["response"]
 
         generated_role = (
-            self._extract_from_xml(generated_role, "name").split(":")[0].strip()
+            self._extract_from_xml(_generated_response, "name").split(":")[0].strip()
         )
+        refined_response = _generated_response.split("<name>")[0].strip()
 
         if generated_role in available_roles:
-            return generated_role
+            return generated_role, refined_response
 
         self.logger.warning(
             "Invalid role '%s' generated. Selecting next available role.",
@@ -789,7 +793,7 @@ class BaseLLM:
             return available_roles[(current_index + 1) % len(available_roles)]
         except Exception as e:
             self.logger.error("Error determining next role: %s", e)
-            return available_roles[0]
+            return available_roles[0], ""
 
     def validate_chat_history(
         self, chat_history: Optional[List[Union[ChatMessage, Dict]]]
