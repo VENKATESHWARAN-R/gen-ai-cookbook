@@ -35,7 +35,6 @@ def setup_logging():
 
 
 logger = setup_logging()
-
 environment = load_environment()
 
 MODEL_REGISTRY = {
@@ -47,9 +46,7 @@ MODEL_REGISTRY = {
 }
 
 ingress_root_path = os.getenv("INGRESS_ROOT_PATH", "")
-
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", None)
-
 DEFAULT_SYSTEM_PROMPT = os.getenv("DEFAULT_SYSTEM_PROMPT", None)
 
 
@@ -57,7 +54,7 @@ def load_configs() -> dict:
     """
     Load the configurations from environment variables.
     """
-    model_class = os.getenv("MODEL", "phi")
+    model_class = os.getenv("MODEL", "gemini")
     model_id = os.getenv("MODEL_ID", DEFAULT_MODEL)
     system_prompt = os.getenv("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
 
@@ -93,9 +90,8 @@ def load_model(model_name: str, model_id: str = None, system_prompt: str = None)
             raise ValueError("GEMINI_API_KEY not set in environment.")
         # Gemini doesn't usually need a model_id, but if you have a version:
         if model_id:
-            logger.info(
-                f"Note: Gemini API ignoring custom model_id={model_id}"
-            )
+            logger.info("Note: Using model_id '%s' with Gemini API", model_id)
+            return model_class(GOOGLE_API_KEY=api_key, model=model_id)
         return model_class(GOOGLE_API_KEY=api_key)
 
     else:

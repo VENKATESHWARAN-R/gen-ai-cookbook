@@ -23,7 +23,6 @@ class GenerateTextRequest(BaseModel):
             "example": {
                 "prompt": "What is the meaning of life?",
                 "max_new_tokens": 50,
-                "skip_special_tokens": True,
                 "kwargs": {"temperature": 0.7}
             }
         }

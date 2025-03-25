@@ -48,9 +48,9 @@ class GeminiApi(BaseLLM):
         _model = "models/gemini-2.0-flash" if not model else model
         # Check if GOOGLE_API_KEY is passed in kwargs
         if "GOOGLE_API_KEY" in kwargs:
-            self._API_KEY = kwargs["GOOGLE_API_KEY"]
+            self._api_key = kwargs["GOOGLE_API_KEY"]
         elif "GOOGLE_API_KEY" in os.environ:
-            self._API_KEY = os.environ["GOOGLE_API_KEY"]
+            self._api_key = os.environ["GOOGLE_API_KEY"]
         else:
             raise ValueError("GOOGLE_API_KEY is required to use Gemini API")
         self.gen_ai_client = None
@@ -68,8 +68,9 @@ class GeminiApi(BaseLLM):
         try:
             self.tokenizer: Tokenizer = Tokenizer()
             self.model = model
-            self.gen_ai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            self.gen_ai_client = genai.Client(api_key=self._api_key)
             self.chat_client = self.gen_ai_client.chats.create(model=self.model)
+            self.logger.info("Loaded model: %s", self.model)
         except Exception as e:
             self.logger.error("Error consiguring model '%s': %s", model, e)
             raise RuntimeError(f"Failed to Configure model '{model}'") from e
@@ -120,7 +121,7 @@ class GeminiApi(BaseLLM):
         """
         # Pass all input arguments to GenerateContentConfig
         _max_tokens = max_new_tokens or self.token_limit
-        config = self._create_config_from_kwargs(max_new_tokens=_max_tokens, **kwargs)
+        config = self._create_config_from_kwargs(max_output_tokens=_max_tokens, **kwargs)
 
         self.logger.info("Generating response for prompt: %s", prompt)
         try:

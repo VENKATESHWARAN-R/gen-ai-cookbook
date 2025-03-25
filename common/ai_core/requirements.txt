@@ -1,0 +1,11 @@
+# Core dependencies
+pydantic>=2.0
+fastapi>=0.115.12
+uvicorn>=0.34.0
+python-dotenv>=1.1.0
+rich>=13.9.4
+torch>=2.6.0
+transformers>=4.50.0
+
+# Google Generative AI SDK
+google-genai>=1.7.0
