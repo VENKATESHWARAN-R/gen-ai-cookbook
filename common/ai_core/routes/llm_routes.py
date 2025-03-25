@@ -63,10 +63,10 @@ def brainstorm(request: BrainstormRequest):
     try:
         result = llm_instance.brainstrom(
             messages=request.messages,
-            role=request.role,
+            role=request.role or "",
             role_play_configs=request.role_play_configs,
             ai_assisted_turns=request.ai_assisted_turns,
-            iam=request.iam,
+            iam=request.iam or None,
             **(request.kwargs or {})
         )
         return result

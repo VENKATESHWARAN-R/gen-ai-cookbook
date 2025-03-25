@@ -768,7 +768,7 @@ class BaseLLM:
         """
         last_role = messages[-1]["role"]
         if len(available_roles) == 2:
-            return next(role for role in available_roles if role != last_role)
+            return next(role for role in available_roles if role != last_role), ""
 
         next_role_prompt = format_prompt_fn(role_play_configs, messages)
         self.logger.debug("Next role prompt: %s", next_role_prompt)
@@ -790,7 +790,7 @@ class BaseLLM:
 
         try:
             current_index = available_roles.index(last_role)
-            return available_roles[(current_index + 1) % len(available_roles)]
+            return available_roles[(current_index + 1) % len(available_roles)], ""
         except Exception as e:
             self.logger.error("Error determining next role: %s", e)
             return available_roles[0], ""
