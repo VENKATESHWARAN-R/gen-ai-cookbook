@@ -101,7 +101,7 @@ class GeminiApi(BaseLLM):
         max_new_tokens: int = None,
         skip_special_tokens: bool = True,
         **kwargs,
-    ) -> Union[List[str], str]:
+    ) -> Union[List[Dict], Dict]:
         """
         Generates text based on the given prompt.
 
@@ -123,11 +123,9 @@ class GeminiApi(BaseLLM):
         _max_tokens = max_new_tokens or self.token_limit
         config = self._create_config_from_kwargs(max_output_tokens=_max_tokens, **kwargs)
 
-        self.logger.info("Generating response for prompt: %s", prompt)
+        self.logger.debug("Generating response for prompt: %s", prompt)
         try:
-            self.logger.debug("Tokenizing prompt: %s", prompt)
             _start_time = time.time()
-            # print(f"Generating response for prompt: \n\n {prompt} \n\n")
             response = self.gen_ai_client.models.generate_content(
                 model=self.model,
                 contents=prompt,

@@ -1,9 +1,12 @@
-from data_store.src.loaders.document_processor import DocumentProcessor
-from data_store.src.embeddings.embedding_service import SentenceTransformerEmbeddings
-from data_store.src.vectorstore.chroma_store import ChromaVectorStore
-from data_store.src.contextualizer.llm_service import LocalLLMContextualizer
-from data_store.src.core.data_pipeline import DataPipeline
-from data_store.src.utils import config
+"""
+This module contains the data store components of the Chroma project.
+"""
+from .src.loaders.document_processor import DocumentProcessor
+from .src.embeddings.embedding_service import SentenceTransformerEmbeddings
+from .src.vectorstore.chroma_store import ChromaVectorStore
+from .src.contextualizer.llm_service import LocalLLMContextualizer
+from .src.core.data_pipeline import DataPipeline
+from .src.utils import config
 
 __all__ = [
     "DocumentProcessor",

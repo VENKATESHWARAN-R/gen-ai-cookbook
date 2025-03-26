@@ -3,16 +3,16 @@ Local LLM Contextualizer
 ------------------------
 """
 import json
-from collections import defaultdict
-import requests
 import logging
-from typing import Optional, Tuple, Dict, Any, List
-from langchain_core.documents import Document
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 import time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional, Tuple
 
+import requests
 from data_store.src.utils import config
+from langchain_core.documents import Document
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class LocalLLMContextualizer:
             api_url: The URL of your local LLM's completion endpoint.
         """
         self.api_url = api_url
-        logger.info(f"Local LLM Contextualizer configured for URL: {api_url}")
+        logger.info("Local LLM Contextualizer configured for URL: %s", api_url)
 
     def _generate_context_with_llm(
         self, full_doc_content: str, chunk_content: str
@@ -35,7 +35,7 @@ class LocalLLMContextualizer:
         prompt = config.CONTEXTUAL_PROMPT_TEMPLATE.format(
             full_doc_content=full_doc_content, chunk_content=chunk_content
         )
-        logger.debug(f"Generated prompt: '{prompt}'")
+        logger.debug("Generated prompt: '%s'", prompt)
 
         headers = {"accept": "application/json", "Content-Type": "application/json"}
         data = {"prompt": prompt}
@@ -51,18 +51,18 @@ class LocalLLMContextualizer:
 
             if not context:
                 logger.warning(
-                    f"LLM returned empty context for chunk: {chunk_content[:50]}..."
+                    "LLM returned empty context for chunk: %s...", chunk_content[:50]
                 )
                 return None
 
-            logger.debug(f"Generated context: '{context}'")
+            logger.debug("Generated context: '%s'", context)
             return context
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error calling local LLM at {self.api_url}: {e}")
+            logger.error("Error calling local LLM at %s: %s", self.api_url, e)
             return None
         except Exception as e:
-            logger.error(f"Error processing LLM response: {e}")
+            logger.error("Error processing LLM response: %s", e)
             return None
 
     def _process_chunk_for_context(
@@ -74,7 +74,8 @@ class LocalLLMContextualizer:
 
         if not full_doc_content:
             logger.warning(
-                f"Could not find full document content for source: {source}. Skipping contextualization for this chunk."
+                "Could not find full document content for source: %s. Skipping contextualization for this chunk.",
+                source,
             )
             return chunk, None  # Return original chunk
 
@@ -85,7 +86,7 @@ class LocalLLMContextualizer:
 
         if generated_context:
             # Prepend context for embedding, store original/context in metadata
-            augmented_content = f"{original_content}\n\nContext: {generated_context}"
+            augmented_content = f"{original_content}\n\nContext of chunk over document: {generated_context}"
             augmented_chunk = Document(
                 page_content=augmented_content,
                 metadata={
@@ -120,11 +121,13 @@ class LocalLLMContextualizer:
 
         start_time = time.time()
         logger.info(
-            f"Starting contextualization for {len(chunks)} chunks using {max_workers} workers..."
+            "Starting contextualization for %d chunks using %d workers...",
+            len(chunks),
+            max_workers,
         )
 
         # Create a map of source -> full document content for quick lookup
-        logger.debug(f"Aggregating content from {len(documents)} page-documents into full_doc_map...")
+        logger.debug("Aggregating content from %d page-documents into full_doc_map...", len(documents))
         full_doc_map = defaultdict(str)
         for i, doc in enumerate(documents):
             source = doc.metadata.get("source")
@@ -135,7 +138,7 @@ class LocalLLMContextualizer:
                  # Assign a unique key if source is missing, though less ideal
                  missing_source_key = f"unknown_source_{i}"
                  full_doc_map[missing_source_key] += doc.page_content + "\n\n"
-                 logger.warning(f"Document at index {i} missing 'source' metadata. Using key '{missing_source_key}'. Chunk context might be inaccurate.")
+                 logger.warning("Document at index %d missing 'source' metadata. Using key '%s'. Chunk context might be inaccurate.", i, missing_source_key)
 
         contextualized_chunks = []
         processed_count = 0
@@ -166,7 +169,9 @@ class LocalLLMContextualizer:
                         failed_count += 1
                 except Exception as exc:
                     logger.error(
-                        f'Chunk from {original_chunk.metadata.get("source", "unknown")} generated an exception during contextualization: {exc}'
+                        "Chunk from %s generated an exception during contextualization: %s",
+                        original_chunk.metadata.get("source", "unknown"),
+                        exc,
                     )
                     contextualized_chunks.append(
                         original_chunk
@@ -176,10 +181,12 @@ class LocalLLMContextualizer:
 
         end_time = time.time()
         logger.info(
-            f"Contextualization finished in {end_time - start_time:.2f} seconds."
+            "Contextualization finished in %.2f seconds.", end_time - start_time
         )
         logger.info(
-            f"Successfully processed: {processed_count}, Failed to generate/add context for: {failed_count} chunks."
+            "Successfully processed: %d, Failed to generate/add context for: %d chunks.",
+            processed_count,
+            failed_count,
         )
 
         return contextualized_chunks

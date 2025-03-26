@@ -1,9 +1,11 @@
 langchain
+langchain-community
 chromadb
 sentence-transformers
 boto3
 pymupdf
-unstructured[all-docs]
+unstructured[md]
+nltk
 docx2txt
 requests
 numpy

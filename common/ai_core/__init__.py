@@ -1,4 +1,3 @@
-
 """
 Setup the AI Core package.
 
@@ -14,4 +13,12 @@ from .ai_model import GemmaLocal
 from .ai_model import GeminiApi
 from .ai_model import QwenLocal
 
-__all__ = ["RolePlay", "Role", "LlamaLocal", "PhiLocal", "GemmaLocal", "QwenLocal", "GeminiApi"]
+__all__ = [
+    "RolePlay",
+    "Role",
+    "LlamaLocal",
+    "PhiLocal",
+    "GemmaLocal",
+    "QwenLocal",
+    "GeminiApi",
+]

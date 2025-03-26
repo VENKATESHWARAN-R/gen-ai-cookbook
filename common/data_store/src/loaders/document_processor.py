@@ -1,23 +1,18 @@
 """
 Document Processor
 """
-import os
-from langchain_core.documents import Document
-from langchain_community.document_loaders import (
-    PyMuPDFLoader,
-    Docx2txtLoader,
-    CSVLoader,
-    UnstructuredMarkdownLoader,
-    UnstructuredHTMLLoader,
-    UnstructuredPowerPointLoader,
-    TextLoader,
-    WebBaseLoader,
-)
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from typing import List, Dict, Union, Optional
-import boto3
 import logging
+import os
+from typing import List, Optional, Union
+
+import boto3
 from data_store.src.utils import config
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import (CSVLoader, Docx2txtLoader,
+                                                  PyMuPDFLoader, TextLoader,
+                                                  UnstructuredMarkdownLoader,
+                                                  WebBaseLoader)
+from langchain_core.documents import Document
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,9 +55,6 @@ class DocumentProcessor:
             ".csv": CSVLoader,
             ".txt": TextLoader,
             ".md": UnstructuredMarkdownLoader,
-            ".html": UnstructuredHTMLLoader,
-            ".htm": UnstructuredHTMLLoader,
-            ".pptx": UnstructuredPowerPointLoader,
         }
 
     def _load_documents_from_loader(self, loader) -> List[Document]:

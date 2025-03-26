@@ -2,24 +2,23 @@
 ChromaVectorStore class for interacting with ChromaDB.
 """
 
+import logging
+import uuid
+from typing import Any, Dict, List
+
 import chromadb
 from chromadb import EmbeddingFunction
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
-from langchain_core.documents import Document
-from typing import List, Dict, Any
-import uuid
-import logging
-
+from data_store.src.embeddings.embedding_service import \
+    SentenceTransformerEmbeddings
 from data_store.src.utils import config
-from data_store.src.embeddings.embedding_service import SentenceTransformerEmbeddings
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from langchain_core.documents import Document
+from langchain_core.retrievers import BaseRetriever
 
 logger = logging.getLogger(__name__)
 
-# For stopping the ChromaDB client sending telemetry data
-client = chromadb.Client(Settings(anonymized_telemetry=False))
 
-class CustomChromaEmbedder(embedding_functions.EmbeddingFunction):
+class CustomChromaEmbedder(EmbeddingFunction):
     def __init__(self, provider: SentenceTransformerEmbeddings):
         self.provider = provider
 
@@ -42,7 +41,7 @@ class ChromaVectorStore:
             collection_name: Name of the collection within ChromaDB.
             embedding_provider: An instance of SentenceTransformerEmbeddings.
         """
-        logger.info(f"Initializing ChromaDB client at path: {path}")
+        logger.info("Initializing ChromaDB client at path: %s", path)
         self.client = chromadb.PersistentClient(path=path)
 
         self.embedding_provider = (
@@ -55,17 +54,17 @@ class ChromaVectorStore:
         # )
         self.chroma_embedding_function = CustomChromaEmbedder(self.embedding_provider)
 
-        logger.info(f"Getting or creating ChromaDB collection: {collection_name}")
+        logger.info("Getting or creating ChromaDB collection: %s", collection_name)
         try:
             self.collection = self.client.get_or_create_collection(
                 name=collection_name,
                 embedding_function=self.chroma_embedding_function,
                 # metadata={"hnsw:space": "cosine"}
             )
-            logger.info(f"Collection '{collection_name}' ready.")
+            logger.info("Collection '%s' ready.", collection_name)
         except Exception as e:
             logger.error(
-                f"Failed to get or create Chroma collection '{collection_name}': {e}"
+                "Failed to get or create Chroma collection '%s': %s", collection_name, e
             )
             raise
 
@@ -83,7 +82,9 @@ class ChromaVectorStore:
             return
 
         logger.info(
-            f"Adding {len(documents)} documents to collection '{self.collection.name}'..."
+            "Adding %d documents to collection '%s'...",
+            len(documents),
+            self.collection.name,
         )
 
         ids = [str(uuid.uuid4()) for _ in documents]
@@ -100,9 +101,9 @@ class ChromaVectorStore:
         try:
             # ChromaDB's add method will use the collection's embedding function
             self.collection.add(ids=ids, documents=texts, metadatas=metadatas)
-            logger.info(f"Successfully added {len(documents)} documents.")
+            logger.info("Successfully added %d documents.", len(documents))
         except Exception as e:
-            logger.error(f"Failed to add documents to Chroma collection: {e}")
+            logger.error("Failed to add documents to Chroma collection: %s", e)
 
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
         """
@@ -117,7 +118,10 @@ class ChromaVectorStore:
             Returns empty list on error or no results.
         """
         logger.info(
-            f"Performing search in collection '{self.collection.name}' for query: '{query[:50]}...' (k={k})"
+            "Performing search in collection '%s' for query: '%s...' (k=%d)",
+            self.collection.name,
+            query[:50],
+            k,
         )
         try:
             # The query text is automatically embedded by the collection's embedding function
@@ -160,14 +164,14 @@ class ChromaVectorStore:
                             ),
                         }
                     )
-                logger.info(f"Found {len(search_results)} results.")
+                logger.info("Found %d results.", len(search_results))
             else:
                 logger.info("No results found.")
 
             return search_results
 
         except Exception as e:
-            logger.error(f"Error during search in Chroma collection: {e}")
+            logger.error("Error during search in Chroma collection: %s", e)
             return []
 
     def get_collection_count(self) -> int:
@@ -175,13 +179,13 @@ class ChromaVectorStore:
         try:
             return self.collection.count()
         except Exception as e:
-            logger.error(f"Error getting collection count: {e}")
+            logger.error("Error getting collection count: %s", e)
             return 0
 
     def clear_collection(self):
         """Deletes all items from the collection."""
         logger.warning(
-            f"Attempting to clear all items from collection: {self.collection.name}"
+            "Attempting to clear all items from collection: %s", self.collection.name
         )
         try:
             # This is inefficient for large collections. A better way is delete/recreate.
@@ -193,13 +197,90 @@ class ChromaVectorStore:
                 if ids_to_delete:
                     self.collection.delete(ids=ids_to_delete)
                     logger.info(
-                        f"Cleared {len(ids_to_delete)} items from collection '{self.collection.name}'."
+                        "Cleared %d items from collection '%s'.",
+                        len(ids_to_delete),
+                        self.collection.name,
                     )
                 else:
                     logger.info(
-                        f"Collection '{self.collection.name}' was already empty or failed to retrieve IDs."
+                        "Collection '%s' was already empty or failed to retrieve IDs.",
+                        self.collection.name,
                     )
             else:
-                logger.info(f"Collection '{self.collection.name}' is already empty.")
+                logger.info("Collection '%s' is already empty.", self.collection.name)
         except Exception as e:
-            logger.error(f"Error clearing collection '{self.collection.name}': {e}")
+            logger.error("Error clearing collection '%s': %s", self.collection.name, e)
+
+    def get_relevant_documents(
+        self,
+        query,
+        score_threshold: float = None,
+        k: int = 5,
+        **kwargs,
+    ) -> List[Document]:
+        """
+        Retrieves relevant documents from the collection based on the query.
+        Filters results based on the score_threshold if provided.
+
+        Args:
+            query: The search query string.
+            run_manager: CallbackManagerForRetrieverRun instance.
+            score_threshold: The minimum similarity score to consider.
+            k: The number of top results to retrieve.
+
+        Returns:
+            A list of LangChain Document objects.
+        """
+        search_results = self.search(query, k=k)
+        if not search_results:
+            return []
+
+        relevant_documents = []
+        for result in search_results:
+            if score_threshold and result["similarity"] < score_threshold:
+                continue
+
+            # Create a Document object with the retrieved data
+            doc = Document(
+                page_content=result["document"],
+                metadata=result["metadata"],
+                score=result["similarity"],
+            )
+            relevant_documents.append(doc)
+
+        return relevant_documents
+
+
+class CustomChromaRetriever(BaseRetriever):
+    def __init__(self, chroma_store: ChromaVectorStore):
+        self.chroma_store = chroma_store
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *args,
+        run_manager: CallbackManagerForRetrieverRun,
+        score_threshold: float = None,
+        k: int = 5,
+        **kwargs,
+    ) -> List[Document]:
+        """
+        Retrieves relevant documents from the collection based on the query.
+        Filters results based on the score_threshold if provided.
+        Refer - https://python.langchain.com/docs/how_to/custom_retriever/
+
+        Args:
+            query: The search query string.
+            run_manager: CallbackManagerForRetrieverRun instance.
+            score_threshold: The minimum similarity score to consider.
+            k: The number of top results to retrieve.
+
+        Returns:
+            A list of LangChain Document objects.
+        """
+        return self.chroma_store.get_relevant_documents(
+            query,
+            run_manager=run_manager,
+            score_threshold=score_threshold,
+            k=k,
+        )

@@ -175,7 +175,7 @@ class BaseLLM:
         # print("Running inference for prompt: ", prompt)
         _prompt = prompt if isinstance(prompt, list) else [str(prompt)]
 
-        self.logger.info("Generating response for prompt: %s", _prompt)
+        self.logger.debug("Generating response for prompt: %s", _prompt)
         try:
             with torch.inference_mode():
                 self.logger.debug("Tokenizing prompt: %s", prompt)
