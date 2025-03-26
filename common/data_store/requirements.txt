@@ -1,0 +1,10 @@
+langchain
+chromadb
+sentence-transformers
+boto3
+pymupdf
+unstructured[all-docs]
+docx2txt
+requests
+numpy
+tqdm

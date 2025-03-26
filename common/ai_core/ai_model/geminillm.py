@@ -45,7 +45,7 @@ class GeminiApi(BaseLLM):
         system_prompt: str = None,
         **kwargs,
     ):
-        _model = "models/gemini-2.0-flash" if not model else model
+        _model = "models/gemini-2.0-flash-lite" if not model else model
         # Check if GOOGLE_API_KEY is passed in kwargs
         if "GOOGLE_API_KEY" in kwargs:
             self._api_key = kwargs["GOOGLE_API_KEY"]
