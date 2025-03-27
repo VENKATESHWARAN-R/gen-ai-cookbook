@@ -1,6 +1,6 @@
 """
-Sub class for qwen specifically created for qwen2.5
-This inherits the base llm and implements the specific methods for Phi-4-mini-instruct
+Sub class for IBM GRanite specifically created for llama 3.2
+This inherits the base llm and implements the specific methods for llama 3.2
 
 First Version: 2025-Mar-13
 """
@@ -10,7 +10,7 @@ from .basellm import BaseLLM
 
 def get_tool_calling_prompt() -> str:
     """
-    Tool calling prompt for Qwen model.
+    Tool calling prompt for Granite model.
     Putting it inside a function to avoid spamming the global namespace.
     """
     return """
@@ -19,26 +19,21 @@ You are an expert in function composition. Given a question and available Tools,
 If no function applies or parameters are missing, indicate that. Do not include extra text.
 
 # Tools
-
 You may call one or more functions to assist with the user query.
-
-You are provided with function signatures within <tools></tools> XML tags:
-
-<tools>
-{functions_definition}
-</tools>
 
 For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML 
 tags:
 <tool_call>
 {{"name": <function-name>, "arguments": <args-json-object>}}
-</tool_call>
+</tool_call><|end_of_text|>
+
+<|start_of_role|>tools<|end_of_role|>{functions_definition}
 """
 
 
-class QwenLocal(BaseLLM):
+class GraniteLocal(BaseLLM):
     """
-    A class to represent Phi local model for text generation.
+    A class to represent Granite local model for text generation.
 
     Attributes:
     ----------
@@ -57,7 +52,7 @@ class QwenLocal(BaseLLM):
         system_prompt: str = None,
         **kwargs,
     ):
-        _model = "Qwen/Qwen2.5-3B-Instruct" if not model else model
+        _model = "ibm-granite/granite-3.2-2b-instruct" if not model else model
         super().__init__(_model, max_history, system_prompt, **kwargs)
         self.logger.debug("Default role of the AI assistant: %s", system_prompt)
 
@@ -65,31 +60,32 @@ class QwenLocal(BaseLLM):
     def special_tokens(self) -> List[str]:
         """Abstract property for special tokens that must be implemented in subclasses."""
         return [
-            "<|im_start|>",
-            "<|im_end|>",
-            "<|endoftext|>",
+            "<|start_of_role|>",
+            "<|end_of_role|>",
+            "<|end_of_text|>",
+            "<|tool_call|>",
         ]
 
     @property
     def system_template(self) -> str:
         """System message template"""
-        return "<|im_start|>system\n{system_prompt}<|im_end|>"
+        return "<|start_of_role|>system<|end_of_role|>{system_prompt}<|end_of_text|>"
 
     @property
     def user_turn_template(self) -> str:
         """User turn template"""
-        return "<|im_start|>user\n{user_prompt}<|im_end|>"
+        return "<|start_of_role|>user<|end_of_role|>{user_prompt}<|end_of_text|>"
 
     @property
     def assistant_turn_template(self) -> str:
         """Assistant turn template"""
-        return "<|im_start|>assistant\n{assistant_response}<|im_end|>"
+        return "<|start_of_role|>assistant<|end_of_role|>{assistant_response}<|end_of_text|>"
 
     @property
     def assistant_template(self) -> str:
         """Assistant response placeholder"""
-        return "<|im_start|>assistant\n"
-
+        return "<|start_of_role|>assistant<|end_of_role|>"
+    
     @property
     def tool_calling_prompt(self) -> str:
         """Tool calling prompt"""

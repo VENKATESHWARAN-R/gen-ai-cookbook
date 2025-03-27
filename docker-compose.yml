@@ -1,6 +1,21 @@
-version: '3.9'
+networks:
+  devnet:
+    driver: bridge
 
 services:
+  chromadb:
+    image: chromadb/chroma:0.6.3
+    volumes:
+      - ./chromadb:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY:-FALSE}
+    ports:
+      - 8001:8000
+    networks:
+      - devnet
+
   postgres:
     image: postgres
     restart: always
@@ -10,6 +25,8 @@ services:
       POSTGRES_PASSWORD: mypass
       POSTGRES_DB: myappdb
     ports:
-      - "5431:5432"
+      - "5432:5432"
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - devnet

@@ -15,7 +15,8 @@ LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:8000/api/llm/genera
 # Example: LOCAL_LLM_REQUEST_TEMPLATE = {"prompt": "{prompt}", "n_predict": 128}
 
 # --- ChromaDB Configuration ---
-CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./data_layer_db")
+CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST", "localhost")
+CHROMA_DB_PORT = int(os.getenv("CHROMA_DB_PORT", 8001))
 CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "my_documents")
 
 # --- Embedding Configuration ---

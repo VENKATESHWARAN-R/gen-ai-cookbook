@@ -29,7 +29,8 @@ class CustomChromaEmbedder(EmbeddingFunction):
 class ChromaVectorStore:
     def __init__(
         self,
-        path: str = config.CHROMA_DB_PATH,
+        hostname: str = config.CHROMA_DB_HOST,
+        port: int = config.CHROMA_DB_PORT,
         collection_name: str = config.CHROMA_COLLECTION_NAME,
         embedding_provider: SentenceTransformerEmbeddings = None,  # Pass instance
     ):
@@ -41,8 +42,8 @@ class ChromaVectorStore:
             collection_name: Name of the collection within ChromaDB.
             embedding_provider: An instance of SentenceTransformerEmbeddings.
         """
-        logger.info("Initializing ChromaDB client at path: %s", path)
-        self.client = chromadb.PersistentClient(path=path)
+        logger.info("Connecting to ChromaDB at %s:%d", hostname, port)
+        self.client = chromadb.HttpClient(host=hostname, port=port)
 
         self.embedding_provider = (
             embedding_provider or SentenceTransformerEmbeddings()

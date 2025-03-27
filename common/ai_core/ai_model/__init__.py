@@ -12,5 +12,6 @@ from .phillm import PhiLocal
 from .gemmallm import GemmaLocal
 from .geminillm import GeminiApi
 from .qwenllm import QwenLocal
+from .granitellm import GraniteLocal
 
-__all__ = ["RolePlay", "Role", "LlamaLocal", "PhiLocal", "GemmaLocal", "QwenLocal", "GeminiApi"]
+__all__ = ["RolePlay", "Role", "LlamaLocal", "PhiLocal", "GemmaLocal", "QwenLocal", "GraniteLocal", "GeminiApi"]

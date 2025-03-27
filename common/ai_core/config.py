@@ -6,7 +6,7 @@ import os
 import logging
 from dotenv import load_dotenv
 
-from ai_core.ai_model import LlamaLocal, PhiLocal, GemmaLocal, GeminiApi, QwenLocal
+from ai_core.ai_model import LlamaLocal, PhiLocal, GemmaLocal, GeminiApi, QwenLocal, GraniteLocal
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ MODEL_REGISTRY = {
     "llama": LlamaLocal,
     "phi": PhiLocal,
     "gemini": GeminiApi,
+    "granite": GraniteLocal,
 }
 
 ingress_root_path = os.getenv("INGRESS_ROOT_PATH", "")

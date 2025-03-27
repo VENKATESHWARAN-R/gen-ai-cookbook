@@ -8,7 +8,7 @@ First Version: 2025-Mar-13
 from typing import List
 
 import torch
-from transformers import AutoTokenizer, Gemma3ForCausalLM
+from transformers import AutoTokenizer, Gemma3ForConditionalGeneration
 
 from .basellm import BaseLLM
 
@@ -47,9 +47,9 @@ class GemmaLocal(BaseLLM):
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model, torch_dtype=torch.bfloat16, **kwargs
             )
-            self.model = Gemma3ForCausalLM.from_pretrained(
+            self.model = Gemma3ForConditionalGeneration.from_pretrained(
                 model, torch_dtype=torch.bfloat16, **kwargs
-            )
+            ).eval()
             self.model.to(self.device)
         except Exception as e:
             self.logger.error("Error loading model '%s': %s", model, e)
