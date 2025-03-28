@@ -13,7 +13,7 @@ from rich.console import Console
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # Local imports
-from ai_core.ai_model import QwenLocal, GemmaLocal, LlamaLocal, PhiLocal, GeminiApi
+from ai_core.ai_model import QwenLocal, GemmaLocal, LlamaLocal, PhiLocal, GeminiApi, GraniteLocal
 from ai_core.test.llm_tester import LLMTester
 
 # Test configs
@@ -33,6 +33,7 @@ MODEL_REGISTRY = {
     "llama":   LlamaLocal,
     "phi":     PhiLocal,
     "gemini":  GeminiApi,
+    "granite": GraniteLocal,
 }
 
 def load_model(model_name: str, model_id: str = None):

@@ -8,10 +8,10 @@ in the vector store, and retrieves relevant documents for a given query.
 import logging
 from typing import List, Union, Dict, Any
 
-from data_store.src.loaders.document_processor import DocumentProcessor
-from data_store.src.embeddings.embedding_service import SentenceTransformerEmbeddings
-from data_store.src.vectorstore.chroma_store import ChromaVectorStore
-from data_store.src.contextualizer.llm_service import LocalLLMContextualizer
+from common.data_store.src.document_processor import DocumentProcessor
+from common.data_store.src.embedding_service import SentenceTransformerEmbeddings
+from common.data_store.src.chroma_store import ChromaVectorStore
+from common.data_store.src.llm_service import LocalLLMContextualizer
 
 logger = logging.getLogger(__name__)
 

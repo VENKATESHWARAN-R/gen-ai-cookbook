@@ -6,7 +6,7 @@ import os
 from typing import List, Optional, Union
 
 import boto3
-from data_store.src.utils import config
+from common.data_store.src import config
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (CSVLoader, Docx2txtLoader,
                                                   PyMuPDFLoader, TextLoader,
@@ -38,7 +38,7 @@ class DocumentProcessor:
                 )
                 logger.info("S3 client initialized.")
             except Exception as e:
-                logger.error(f"Failed to initialize S3 client: {e}")
+                logger.error("Failed to initialize S3 client: %s", e)
         else:
             logger.warning("AWS credentials not provided. S3 functionality disabled.")
 
@@ -64,7 +64,7 @@ class DocumentProcessor:
         except Exception as e:
             # Attempt to get source if possible
             source = getattr(loader, 'file_path', getattr(loader, 'web_path', 'Unknown Source'))
-            logger.error(f"Error loading document {source}: {e}")
+            logger.error("Error loading document %s: %s", source, e)
             return []
 
     def _process_single_file(self, file_path: str) -> List[Document]:
@@ -74,11 +74,11 @@ class DocumentProcessor:
         loader_class = self.loaders_map.get(ext)
 
         if loader_class:
-            logger.info(f"Processing file: {file_path} using {loader_class.__name__}")
+            logger.info("Processing file: %s using %s", file_path, loader_class.__name__)
             loader = loader_class(file_path)
             return self._load_documents_from_loader(loader)
         else:
-            logger.warning(f"Unsupported file format: {file_path}")
+            logger.warning("Unsupported file format: %s", file_path)
             return []
 
     def load_from_source(self, source: Union[str, List[str]], source_type: str = "file", recursive: bool = True) -> List[Document]:
@@ -101,14 +101,14 @@ class DocumentProcessor:
                 if os.path.isfile(file_path):
                      all_docs.extend(self._process_single_file(file_path))
                 else:
-                    logger.warning(f"File not found: {file_path}")
+                    logger.warning("File not found: %s", file_path)
 
         elif source_type == "directory":
             for dir_path in sources:
                 if not os.path.isdir(dir_path):
-                    logger.warning(f"Directory not found: {dir_path}")
+                    logger.warning("Directory not found: %s", dir_path)
                     continue
-                logger.info(f"Scanning directory: {dir_path} (recursive={recursive})")
+                logger.info("Scanning directory: %s (recursive=%s)", dir_path, recursive)
                 for root, _, files in os.walk(dir_path):
                     for file in files:
                         file_path = os.path.join(root, file)
@@ -127,7 +127,7 @@ class DocumentProcessor:
                     bucket, key = s3_uri.split('/', 1)
                     local_file = os.path.join(config.TEMP_DIR, os.path.basename(key))
                     os.makedirs(config.TEMP_DIR, exist_ok=True)
-                    logger.info(f"Downloading s3://{bucket}/{key} to {local_file}")
+                    logger.info("Downloading s3://%s/%s to %s", bucket, key, local_file)
                     self.s3_client.download_file(bucket, key, local_file)
                     docs = self._process_single_file(local_file)
                     # Add S3 source to metadata
@@ -136,18 +136,18 @@ class DocumentProcessor:
                     all_docs.extend(docs)
                     os.remove(local_file)
                 except Exception as e:
-                    logger.error(f"Failed to process S3 file {s3_uri}: {e}")
+                    logger.error("Failed to process S3 file %s: %s", s3_uri, e)
 
         elif source_type == "web":
              for url in sources:
-                 logger.info(f"Loading web page: {url}")
+                 logger.info("Loading web page: %s", url)
                  loader = WebBaseLoader(url)
                  all_docs.extend(self._load_documents_from_loader(loader))
 
         else:
-             logger.error(f"Unsupported source_type: {source_type}")
+             logger.error("Unsupported source_type: %s", source_type)
 
-        logger.info(f"Loaded {len(all_docs)} documents initially.")
+        logger.info("Loaded %d documents initially.", len(all_docs))
         return all_docs
 
     def create_chunks(self, documents: List[Document]) -> List[Document]:
@@ -162,7 +162,12 @@ class DocumentProcessor:
         """
         if not documents:
             return []
-        logger.info(f"Splitting {len(documents)} documents into chunks (size={self.text_splitter._chunk_size}, overlap={self.text_splitter._chunk_overlap})...")
+        logger.info(
+            "Splitting %d documents into chunks (size=%d, overlap=%d)...",
+            len(documents),
+            self.text_splitter._chunk_size,
+            self.text_splitter._chunk_overlap,
+        )
         chunks = self.text_splitter.split_documents(documents)
-        logger.info(f"Created {len(chunks)} chunks.")
+        logger.info("Created %d chunks.", len(chunks))
         return chunks

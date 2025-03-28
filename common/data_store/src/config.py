@@ -16,7 +16,7 @@ LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:8000/api/llm/genera
 
 # --- ChromaDB Configuration ---
 CHROMA_DB_HOST = os.getenv("CHROMA_DB_HOST", "localhost")
-CHROMA_DB_PORT = int(os.getenv("CHROMA_DB_PORT", 8001))
+CHROMA_DB_PORT = int(os.getenv("CHROMA_DB_PORT", '8001'))
 CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "my_documents")
 
 # --- Embedding Configuration ---
@@ -24,8 +24,8 @@ CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "my_documents")
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-mpnet-base-v2")
 
 # --- Processing Configuration ---
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 512))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 50))
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", '512'))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", '50'))
 
 # --- contextual prompt template ---
 CONTEXTUAL_PROMPT_TEMPLATE = """Given the following document:

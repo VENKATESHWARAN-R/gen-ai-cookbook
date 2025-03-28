@@ -8,9 +8,8 @@ from typing import Any, Dict, List
 
 import chromadb
 from chromadb import EmbeddingFunction
-from data_store.src.embeddings.embedding_service import \
-    SentenceTransformerEmbeddings
-from data_store.src.utils import config
+from common.data_store.src.embedding_service import SentenceTransformerEmbeddings
+from common.data_store.src import config
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever

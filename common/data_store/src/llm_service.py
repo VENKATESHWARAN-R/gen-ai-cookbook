@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
 import requests
-from data_store.src.utils import config
+from common.data_store.src import config
 from langchain_core.documents import Document
 from tqdm import tqdm
 
