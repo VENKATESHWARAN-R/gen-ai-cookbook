@@ -30,7 +30,7 @@ def render_brainstorm_view():
         cols = st.columns([2, 3, 1])
         new_role_name = cols[0].text_input("Role Name (e.g., Alice)", key="bs_new_role")
         new_role_persona = cols[1].text_area(
-            "Persona Description", key="bs_new_persona", height=50
+            "Persona Description", key="bs_new_persona", height=70
         )
         if cols[2].button("Add Role", key="bs_add_role", use_container_width=True):
             if new_role_name and new_role_persona:
@@ -67,10 +67,10 @@ def render_brainstorm_view():
                     st.rerun()
 
         # Select 'iam' (who initiates the next AI turn)
-        role_names = [r["role"] for r in st.session_state.brainstorm_roles]
+        role_names = [""] + [r["role"] for r in st.session_state.brainstorm_roles]   # Add empty string for no selection
         if role_names:
             st.session_state.brainstorm_iam = st.selectbox(
-                "'I am' (Role for next AI turn):",
+                "'I am' (The chat will end when the model thinks you should respond):",
                 options=role_names,
                 index=(
                     role_names.index(st.session_state.brainstorm_iam)
@@ -90,7 +90,7 @@ def render_brainstorm_view():
                 "Role Speaking:", options=role_names, key="bs_msg_role"
             )
             msg_content = msg_cols[1].text_area(
-                "Initial Message Content", key="bs_msg_content", height=50
+                "Initial Message Content", key="bs_msg_content", height=70
             )
             if msg_cols[2].button(
                 "Add Message", key="bs_add_msg", use_container_width=True
@@ -121,7 +121,7 @@ def render_brainstorm_view():
     st.session_state.brainstorm_ai_turns = st.number_input(
         "Number of AI-assisted turns to generate:",
         min_value=1,
-        max_value=10,
+        max_value=25,
         value=st.session_state.brainstorm_ai_turns,
         step=1,
     )
@@ -134,8 +134,8 @@ def render_brainstorm_view():
             st.error("Please define at least one role.")
         elif not st.session_state.brainstorm_messages:
             st.error("Please add at least one initial message.")
-        elif not st.session_state.brainstorm_iam:
-            st.error("Please select the role for the AI's next turn ('I am').")
+        #elif not st.session_state.brainstorm_iam:
+        #    st.error("Please select the role for the AI's next turn ('I am').")
         else:
             # Prepare payload
             messages = st.session_state.brainstorm_messages
@@ -147,7 +147,7 @@ def render_brainstorm_view():
                 # Call API
                 result = api_client.call_brainstorm(
                     messages=messages,
-                    role=None,  # Role seems ambiguous here based on schema, maybe 'iam' is enough? Check API behavior. Let's assume 'iam' is the primary indicator.
+                    #role=None,  # Role is needed when using the AI only for a particular role
                     iam=iam,
                     role_play_configs=role_play_configs,
                     ai_assisted_turns=ai_turns,
@@ -165,10 +165,10 @@ def render_brainstorm_view():
                 f"API Error: {result_data.get('error')} - {result_data.get('detail', 'No details')}"
             )
         elif (
-            isinstance(result_data, dict) and "messages" in result_data
+            isinstance(result_data, dict) and "chat_history" in result_data
         ):  # Assuming result contains the full message history
             # Display the generated conversation
-            for message in result_data["messages"]:
+            for message in result_data["chat_history"]:
                 # Ensure message has expected keys
                 role = message.get("role", "Unknown Role")
                 content = message.get("content", "*No content received*")

@@ -364,7 +364,7 @@ class GeminiApi(BaseLLM):
     @property
     def system_template(self) -> str:
         """System message template"""
-        return "\n{system_prompt}\n"
+        return "\n{system_prompt}\n USER:"
 
     @property
     def user_turn_template(self) -> str:

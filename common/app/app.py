@@ -21,7 +21,7 @@ if "backend_health" not in st.session_state:
     if (
         health_status
         and isinstance(health_status, dict)
-        and health_status.get("status") == "ok"
+        and health_status.get("status") == "healthy"
     ):  # Adapt based on actual healthcheck response
         st.session_state.backend_health = "ok"
     else:

@@ -22,7 +22,7 @@ BACKEND_API_BASE_URL = os.getenv(
     "BACKEND_API_BASE_URL", "http://localhost:8000"
 )  # Backend API base URL
 BACKEND_API_TIMEOUT = int(
-    os.getenv("BACKEND_API_TIMEOUT", "30")
+    os.getenv("BACKEND_API_TIMEOUT", "60")
 )  # Backend API timeout in seconds
 BACKEND_API_HEADERS = {
     "Content-Type": "application/json",
