@@ -8,10 +8,9 @@ in the vector store, and retrieves relevant documents for a given query.
 import logging
 from typing import List, Union, Dict, Any
 
-from common.data_store.src.document_processor import DocumentProcessor
-from common.data_store.src.embedding_service import SentenceTransformerEmbeddings
-from common.data_store.src.chroma_store import ChromaVectorStore
-from common.data_store.src.llm_service import LocalLLMContextualizer
+from document_processor import RAGDocumentProcessor
+from embedding_service import SentenceTransformerEmbeddings
+from chroma_store import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -19,22 +18,20 @@ logger = logging.getLogger(__name__)
 class DataPipeline:
     def __init__(
         self,
-        document_processor: DocumentProcessor = None,
+        document_processor: RAGDocumentProcessor = None,
         embedding_provider: SentenceTransformerEmbeddings = None,
         vector_store: ChromaVectorStore = None,
-        contextualizer: LocalLLMContextualizer = None,
     ):
         """
         Initializes the data pipeline with necessary components.
         If components are not provided, default instances are created.
         """
-        self.document_processor = document_processor or DocumentProcessor()
+        self.document_processor = document_processor or RAGDocumentProcessor()
         self.embedding_provider = embedding_provider or SentenceTransformerEmbeddings()
         # Pass the embedding provider to the vector store if creating it here
         self.vector_store = vector_store or ChromaVectorStore(
             embedding_provider=self.embedding_provider
         )
-        self.contextualizer = contextualizer or LocalLLMContextualizer()
         logger.info("Data Pipeline initialized.")
 
     def process_and_store(
@@ -51,17 +48,13 @@ class DataPipeline:
         Args:
             source: Path(s), URL(s), or S3 key(s).
             source_type: Type of the source ('file', 'directory', 's3', 'web').
-            contextualize: Whether to add context using the local LLM.
             max_context_workers: Number of threads for parallel contextualization.
 
         Returns:
             The number of chunks successfully added to the vector store.
         """
         logger.info(
-            "Starting processing for source: %s (type: %s, contextualize: %s)",
-            source,
-            source_type,
-            contextualize,
+            "Starting processing for source: %s (type: %s)", source, source_type
         )
 
         # 1. Load Documents
@@ -73,21 +66,10 @@ class DataPipeline:
         logger.info("Loaded %d documents from source.", len(documents))
 
         # 2. Create Chunks
-        chunks = self.document_processor.create_chunks(documents)
-        if not chunks:
+        chunks_to_embed = self.document_processor.chunk_documents(documents)
+        if not chunks_to_embed:
             logger.warning("No chunks created from documents. Aborting processing.")
             return 0
-
-        # 3. Contextualize Chunks (Optional)
-        if contextualize:
-            chunks_to_embed = self.contextualizer.add_context_to_chunks(
-                documents,  # Pass original documents for full context lookup
-                chunks,
-                max_workers=max_context_workers,
-            )
-        else:
-            chunks_to_embed = chunks  # Embed original chunks if not contextualizing
-            logger.info("Skipping contextualization step.")
 
         if not chunks_to_embed:
             logger.error("No chunks available after contextualization step. Aborting.")

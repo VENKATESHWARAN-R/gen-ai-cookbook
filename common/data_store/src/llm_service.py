@@ -10,15 +10,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
 import requests
-from common.data_store.src import config
 from langchain_core.documents import Document
 from tqdm import tqdm
+
+import config as config  # Ensure 'config.py' is in the Python path or the same directory
 
 logger = logging.getLogger(__name__)
 
 
 class LocalLLMContextualizer:
-    def __init__(self, api_url: str = config.LOCAL_LLM_URL):
+    def __init__(self, api_url: str = config.LLM_ENDPOINT_URL):
         """
         Initializes the contextualizer with the local LLM API endpoint.
 

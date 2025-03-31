@@ -12,6 +12,8 @@ docker-compose up -d
 
 cd common
 uvicorn ai_core.main:app --reload
+
+streamlit run rag_ui.py
 http://localhost:8000/docs
 
 curl -X 'POST' \

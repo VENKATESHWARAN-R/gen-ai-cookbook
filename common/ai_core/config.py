@@ -55,7 +55,7 @@ def load_configs() -> dict:
     """
     Load the configurations from environment variables.
     """
-    model_class = os.getenv("MODEL", "gemma").lower()
+    model_class = os.getenv("MODEL", "gemini").lower()
     model_id = os.getenv("MODEL_ID", DEFAULT_MODEL)
     system_prompt = os.getenv("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
 

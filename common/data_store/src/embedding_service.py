@@ -4,8 +4,9 @@ This module provides a service for generating embeddings using the Sentence Tran
 import logging
 from typing import List
 
-from common.data_store.src import config
 from sentence_transformers import SentenceTransformer
+
+import config as config
 
 logger = logging.getLogger(__name__)
 

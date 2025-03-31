@@ -6,13 +6,14 @@ import logging
 import uuid
 from typing import Any, Dict, List
 
-import chromadb
-from chromadb import EmbeddingFunction
-from common.data_store.src.embedding_service import SentenceTransformerEmbeddings
-from common.data_store.src import config
+import config as config
+from embedding_service import SentenceTransformerEmbeddings
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
+
+import chromadb
+from chromadb import EmbeddingFunction
 
 logger = logging.getLogger(__name__)
 

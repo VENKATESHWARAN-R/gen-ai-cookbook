@@ -17,3 +17,6 @@ docx2txt
 requests
 numpy
 tqdm
+
+## For UI
+streamlit

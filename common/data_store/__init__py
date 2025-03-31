@@ -2,7 +2,7 @@
 This module contains the data store components of the Chroma project.
 """
 
-from .src.document_processor import DocumentProcessor
+from .src.document_processor import RAGDocumentProcessor
 from .src.embedding_service import SentenceTransformerEmbeddings
 from .src.chroma_store import ChromaVectorStore
 from .src.llm_service import LocalLLMContextualizer
@@ -10,7 +10,7 @@ from .src.data_pipeline import DataPipeline
 from .src import config
 
 __all__ = [
-    "DocumentProcessor",
+    "RAGDocumentProcessor",
     "SentenceTransformerEmbeddings",
     "ChromaVectorStore",
     "LocalLLMContextualizer",
